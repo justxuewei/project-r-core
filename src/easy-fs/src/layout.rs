@@ -55,6 +55,7 @@ pub enum DiskInodeType {
 }
 
 type IndirectBlock = [u32; INODE_INDIRECT1_COUNT];
+type DataBlock = [u8; BLOCK_SIZE];
 
 // DiskInode 表示一个文件或目录，
 // 如果 INODE_DIRECT_COUNT 的长度为 28，则 DiskInode 的长度为 32 * 4B = 128B，所
@@ -200,9 +201,9 @@ impl DiskInode {
         total_blocks -= INODE_INDIRECT1_COUNT as u32;
         // fill indirect2 block
         let mut a0 = current_blocks as usize / INODE_INDIRECT1_COUNT; // indirect2 current block index
-        let mut b0 = current_blocks as usize % INODE_INDIRECT1_COUNT; // indirect1 current block index
+        let mut b0 = current_blocks as usize % INODE_INDIRECT1_COUNT; // the first indirect1 current block index
         let a1 = total_blocks as usize / INODE_INDIRECT1_COUNT; // indirect2 total block index
-        let b1 = total_blocks as usize % INODE_INDIRECT1_COUNT; // indirect1 total block index
+        let b1 = total_blocks as usize % INODE_INDIRECT1_COUNT; // the last indirect1 total block index
         get_block_cache(self.indirect2 as usize, block_device.clone())
             .lock()
             .modify(0, |indirect2_block: &mut IndirectBlock| {
@@ -222,5 +223,156 @@ impl DiskInode {
                     }
                 }
             });
+    }
+
+    // 将 inode 中的 data blocks 重置为空，返回需要被释放的 data block 的 block
+    // ids，是 increase_size 的逆操作
+    pub fn clear_size(&mut self, block_device: Arc<dyn BlockDevice>) -> Vec<u32> {
+        let mut v = Vec::new();
+        let mut data_blocks = self.data_blocks() as usize;
+        self.size = 0;
+        let mut current_block = 0usize;
+        // direct
+        while current_block < data_blocks.min(INODE_DIRECT_COUNT) {
+            v.push(self.direct[current_block]);
+            self.direct[current_block] = 0;
+            current_block += 1;
+        }
+        if current_block <= INODE_DIRECT_COUNT {
+            return v;
+        }
+        // indirect1
+        v.push(self.indirect1);
+        data_blocks -= INODE_DIRECT_COUNT;
+        current_block = 0;
+        get_block_cache(self.indirect1 as usize, block_device.clone())
+            .lock()
+            .modify(0, |indirect1_block: &mut IndirectBlock| {
+                while current_block < data_blocks.min(INODE_INDIRECT1_COUNT) {
+                    v.push(indirect1_block[current_block]);
+                    indirect1_block[current_block] = 0;
+                    current_block += 1;
+                }
+            });
+        self.indirect1 = 0;
+        if current_block <= INODE_INDIRECT1_COUNT {
+            return v;
+        }
+        // indirect2
+        v.push(self.indirect2);
+        data_blocks -= INODE_INDIRECT1_COUNT;
+        assert!(data_blocks <= INODE_INDIRECT2_COUNT);
+        let a1 = data_blocks / INODE_INDIRECT1_COUNT; // indirect2 total block index
+        let b1 = data_blocks % INODE_INDIRECT1_COUNT; // the last indirect1 total block index
+        get_block_cache(self.indirect2 as usize, block_device.clone())
+            .lock()
+            .modify(0, |indirect2_block: &mut IndirectBlock| {
+                // full indirect1 blocks
+                for entry in indirect2_block.iter_mut().take(a1) {
+                    v.push(*entry);
+                    get_block_cache(*entry as usize, block_device.clone())
+                        .lock()
+                        .modify(0, |indirect1_block: &mut IndirectBlock| {
+                            for entry in indirect1_block.iter() {
+                                v.push(*entry);
+                            }
+                        });
+                }
+                // last indirect1 block
+                if b1 > 0 {
+                    v.push(indirect2_block[a1]);
+                    get_block_cache(indirect2_block[a1] as usize, block_device.clone())
+                        .lock()
+                        .modify(0, |indirect1_block: &mut IndirectBlock| {
+                            for entry in indirect1_block.iter().take(b1) {
+                                v.push(*entry);
+                            }
+                        });
+                }
+            });
+        self.indirect2 = 0;
+        v
+    }
+
+    // 从 data block 读取数据到 buf 中，返回读取的字节数，offset 是指数据开始的
+    // 位置
+    pub fn read_at(
+        &self,
+        offset: usize,
+        buf: &mut [u8],
+        block_device: Arc<dyn BlockDevice>,
+    ) -> usize {
+        let mut start = offset;
+        let end = (offset + buf.len()).min(self.size as usize);
+        if start >= end {
+            return 0;
+        }
+        let mut start_block = start / BLOCK_SIZE;
+        let mut read_size = 0usize;
+        loop {
+            let end_current_block = ((start_block + 1) * BLOCK_SIZE).min(end);
+            let block_read_size = end_current_block - start;
+            let dst = &mut buf[read_size..read_size + block_read_size];
+            get_block_cache(
+                self.get_block_id(start_block as u32, block_device.clone()) as usize,
+                block_device.clone(),
+            )
+            .lock()
+            .read(0, |data_block: &DataBlock| {
+                dst.copy_from_slice(
+                    &data_block[start % BLOCK_SIZE..start % BLOCK_SIZE + block_read_size],
+                );
+            });
+            read_size += block_read_size;
+            // the max value of end_current_block is end, so if they are equal,
+            // it means we have read all data.
+            if end_current_block == end {
+                break;
+            }
+            start_block += 1;
+            start = end_current_block;
+        }
+        read_size
+    }
+
+    // 向 data block 写入数据到 buf 中，返回写入的字节数，在 write_at 方法中不会
+    // 自动扩充 self.size，必须提前调用 self.increase_size 方法保证 blocks 的可
+    // 用数量
+    pub fn write_at(
+        &mut self,
+        offset: usize,
+        buf: &mut [u8],
+        block_device: Arc<dyn BlockDevice>,
+    ) -> usize {
+        let mut start = offset;
+        let end = (offset + buf.len()).min(self.size as usize);
+        if start >= end {
+            return 0;
+        }
+        let mut start_block = start / BLOCK_SIZE;
+        let mut write_size = 0usize;
+        loop {
+            let end_current_block = ((start_block + 1) * BLOCK_SIZE).min(end);
+            let block_write_size = end_current_block - start;
+            get_block_cache(
+                self.get_block_id(start_block as u32, block_device.clone()) as usize,
+                block_device.clone(),
+            )
+            .lock()
+            .modify(0, |data_block: &mut DataBlock| {
+                let src = &buf[write_size..write_size + block_write_size];
+                let dst =
+                    &mut data_block[start % BLOCK_SIZE..start % BLOCK_SIZE + block_write_size];
+                dst.copy_from_slice(src);
+            });
+            write_size += block_write_size;
+            if end_current_block == end {
+                break;
+            }
+            start_block += 1;
+            start = end_current_block;
+        }
+
+        write_size
     }
 }
