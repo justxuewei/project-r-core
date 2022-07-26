@@ -12,6 +12,8 @@ const INODE_INDIRECT2_COUNT: usize = INODE_INDIRECT1_COUNT * INODE_INDIRECT1_COU
 const DIRECT_BOUND: usize = INODE_DIRECT_COUNT;
 const INDIRECT1_BOUND: usize = DIRECT_BOUND + INODE_INDIRECT1_COUNT;
 const INDIRECT2_BOUND: usize = INDIRECT1_BOUND + INODE_INDIRECT2_COUNT;
+const NAME_LENGTH_LIMIT: usize = 27;
+const DIR_ENTRY_SIZE: usize = 32;
 
 #[repr(C)]
 pub struct SuperBlock {
@@ -55,7 +57,7 @@ pub enum DiskInodeType {
 }
 
 type IndirectBlock = [u32; INODE_INDIRECT1_COUNT];
-type DataBlock = [u8; BLOCK_SIZE];
+pub type DataBlock = [u8; BLOCK_SIZE];
 
 // DiskInode 表示一个文件或目录，
 // 如果 INODE_DIRECT_COUNT 的长度为 28，则 DiskInode 的长度为 32 * 4B = 128B，所
@@ -374,5 +376,54 @@ impl DiskInode {
         }
 
         write_size
+    }
+}
+
+// DirEntry 表示一个目录项的基本结构，占用 32B（28B + 4B）空间
+#[repr(C)]
+pub struct DirEntry {
+    // name 最长 27 个 char 和一个 '\0'
+    name: [u8; NAME_LENGTH_LIMIT + 1],
+    inode_number: u32,
+}
+
+impl DirEntry {
+    pub fn empty() -> Self {
+        Self {
+            name: [0u8; NAME_LENGTH_LIMIT + 1],
+            inode_number: 0,
+        }
+    }
+
+    pub fn new(name: &str, inode_number: u32) -> Self {
+        assert!(name.len() <= NAME_LENGTH_LIMIT);
+        let mut bytes = [0u8; NAME_LENGTH_LIMIT + 1];
+        bytes[..name.len()].copy_from_slice(name.as_bytes());
+        bytes[name.len()] = '\0' as u8;
+        Self {
+            name: bytes,
+            inode_number,
+        }
+    }
+
+    pub fn as_bytes(&self) -> &[u8] {
+        unsafe {
+            core::slice::from_raw_parts(self as *const _ as usize as *const u8, DIR_ENTRY_SIZE)
+        }
+    }
+
+    pub fn as_bytes_mut(&mut self) -> &mut [u8] {
+        unsafe {
+            core::slice::from_raw_parts_mut(self as *mut _ as usize as *mut u8, DIR_ENTRY_SIZE)
+        }
+    }
+
+    pub fn name(&self) -> &str {
+        let len = (0usize..).find(|i| self.name[*i] == '\0' as u8).unwrap();
+        core::str::from_utf8(&self.name[..len]).unwrap()
+    }
+
+    pub fn inode_number(&self) -> u32 {
+        self.inode_number
     }
 }

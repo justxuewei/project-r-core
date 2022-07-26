@@ -6,16 +6,18 @@ use crate::{
 };
 
 // 一个 block 包含的 bits 的数量
-const BLOCK_BITS: usize = BLOCK_SIZE * 8;
+pub const BLOCK_BITS: usize = BLOCK_SIZE * 8;
 
 // BitmapBlock 表示一个在 block device 上的 bitmap block，easyfs 的 block 的
 // size 为 512B，所以 bitmap block 的长度为 8B * 64 = 512B。
 type BitmapBlock = [u64; 64];
 
-// Bitmap 这个结构是保存在内存中的，它表示一个具体的位图在 block device 中的位
-// 置（bitmap 开始于 start_block_id，长度为 blocks）
+// Bitmap 表示一个具体的 bitmap 在 block device 中的位置，需要注意的是该结构是保
+// 存于 mem 中的，需要去 block device 中读取实际的 bitmap 的值。
 pub struct Bitmap {
+    // 起始 block id
     start_block_id: usize,
+    // blocks 的数量
     blocks: usize,
 }
 
@@ -65,6 +67,10 @@ impl Bitmap {
                 bitmap_block[bitmap_pos] -= 1u64 << bit_pos;
             },
         );
+    }
+
+    pub fn maximum(&self) -> usize {
+        self.blocks * BLOCK_BITS
     }
 }
 
