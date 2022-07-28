@@ -113,12 +113,7 @@ impl EasyFileSystem {
     pub fn root_inode(efs: Arc<Mutex<Self>>) -> Inode {
         let block_device = efs.lock().block_device.clone();
         let (root_block_id, root_block_offset) = efs.lock().get_disk_inode_pos(0);
-        Inode::new(
-            root_block_id,
-            root_block_offset,
-            efs,
-            block_device,
-        )
+        Inode::new(root_block_id, root_block_offset, efs, block_device)
     }
 
     // 获取磁盘上 inode id，返回的结果是 block_id 和 block 内的 offset

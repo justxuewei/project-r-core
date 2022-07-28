@@ -49,7 +49,9 @@ impl Bitmap {
 
                     if let Some((pos, inner_pos)) = pair {
                         bitmap_block[pos] |= 1 << inner_pos;
-                        return Some((bitmap_block_id * BLOCK_BITS + pos * BITMAP_SIZE + inner_pos) as usize);
+                        return Some(
+                            (bitmap_block_id * BLOCK_BITS + pos * BITMAP_SIZE + inner_pos) as usize,
+                        );
                     }
                     None
                 });
