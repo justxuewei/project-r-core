@@ -22,6 +22,13 @@ pub fn get_block_cache(
         .get_block_cache(block_id, block_device)
 }
 
+// 强制将缓冲区的数据写回到磁盘上
+pub fn block_cache_sync_all() {
+    for (_, cache) in BLOCK_CACHE_MANAGER.lock().queue.iter() {
+        cache.lock().sync();
+    }
+}
+
 pub struct BlockCache {
     cache: [u8; BLOCK_SIZE],
     block_id: usize,
