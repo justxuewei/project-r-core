@@ -117,7 +117,7 @@ impl EasyFileSystem {
     }
 
     // 获取磁盘上 inode id，返回的结果是 block_id 和 block 内的 offset
-    fn get_disk_inode_pos(&self, inode_id: u32) -> (u32, usize) {
+    pub fn get_disk_inode_pos(&self, inode_id: u32) -> (u32, usize) {
         let inode_size = core::mem::size_of::<DiskInode>();
         let inodes_pre_block = (BLOCK_SIZE / inode_size) as u32;
         (
