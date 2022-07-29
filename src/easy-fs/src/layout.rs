@@ -296,8 +296,9 @@ impl DiskInode {
         v
     }
 
-    // 从 data block 读取数据到 buf 中，返回读取的字节数，offset 是指数据开始的
-    // 位置
+    // 从 data block 读取数据到 buf 中，返回读取的字节数，
+    // offset 是指数据开始的位置，调用者可以将这些 data block 视为一个连续的区
+    // 域，无需关心 data block 的位置是在 direct/indirect1/indirect2 中的哪个位置
     pub fn read_at(
         &self,
         offset: usize,
@@ -315,6 +316,8 @@ impl DiskInode {
             let end_current_block = ((start_block + 1) * BLOCK_SIZE).min(end);
             let block_read_size = end_current_block - start;
             let dst = &mut buf[read_size..read_size + block_read_size];
+            // self.get_block_id() will determine the place, e.g. indirect1,
+            // indirect2, where the block id is stored.
             get_block_cache(
                 self.get_block_id(start_block as u32, block_device.clone()) as usize,
                 block_device.clone(),
@@ -343,7 +346,7 @@ impl DiskInode {
     pub fn write_at(
         &mut self,
         offset: usize,
-        buf: &mut [u8],
+        buf: &[u8],
         block_device: Arc<dyn BlockDevice>,
     ) -> usize {
         let mut start = offset;
@@ -379,7 +382,8 @@ impl DiskInode {
     }
 }
 
-// DirEntry 表示一个目录项的基本结构，占用 32B（28B + 4B）空间
+// DirEntry 表示一个目录项的基本结构，占用 32B（28B + 4B）空间，
+// 在现有版本中 DirEntry 只支持 root 目录，所以除了 root 目录以外都是指的文件。
 #[repr(C)]
 pub struct DirEntry {
     // name 最长 27 个 char 和一个 '\0'

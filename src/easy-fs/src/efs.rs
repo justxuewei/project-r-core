@@ -132,17 +132,17 @@ impl EasyFileSystem {
     }
 
     // 申请一个 inode，返回 inode 的 id
-    fn alloc_inode(&mut self) -> u32 {
+    pub fn alloc_inode(&mut self) -> u32 {
         self.inode_bitmap.alloc(self.block_device.clone()).unwrap() as u32
     }
 
     // 申请一个 data block，返回磁盘 block id（非 data block 的 block id）
-    fn alloc_data(&mut self) -> u32 {
+    pub fn alloc_data(&mut self) -> u32 {
         self.get_data_block_id(self.data_bitmap.alloc(self.block_device.clone()).unwrap() as u32)
     }
 
     // 释放指定的 data block
-    fn dealloc_data(&mut self, block_id: u32) {
+    pub fn dealloc_data(&mut self, block_id: u32) {
         // erase data from data area
         get_block_cache(block_id as usize, self.block_device.clone())
             .lock()
