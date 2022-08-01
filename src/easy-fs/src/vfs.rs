@@ -45,7 +45,8 @@ impl Inode {
     }
 
     // 查找一个文件名的 inode，仅 root dir 可调用
-    fn find(&self, name: &str) -> Option<Arc<Inode>> {
+    #[allow(unused)]
+    pub fn find(&self, name: &str) -> Option<Arc<Inode>> {
         let fs = self.fs.lock();
         self.read_disk_inode(|disk_inode: &DiskInode| {
             self.find_inode_id(name, disk_inode)
@@ -160,7 +161,7 @@ impl Inode {
         });
     }
 
-    // 读取一些数据
+    // 从 data block 中读取数据
     pub fn read_at(&self, offset: usize, buf: &mut [u8]) -> usize {
         let _fs = self.fs.lock();
         self.read_disk_inode(|disk_inode| {
@@ -168,7 +169,7 @@ impl Inode {
         })
     }
 
-    // 写入一些数据
+    // 从 data block 中写入数据
     pub fn write_at(&self, offset: usize, buf: &[u8]) -> usize {
         let mut fs = self.fs.lock();
         self.modify_disk_inode(|disk_inode| {
@@ -177,7 +178,7 @@ impl Inode {
         })
     }
 
-    // 增加 inode 的 size
+    // 增加 inode 和 data block 的 size
     fn increase_size(
         &self,
         new_size: u32,

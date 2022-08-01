@@ -77,7 +77,7 @@ impl EasyFileSystem {
         let (root_inode_block_id, root_inode_offset) = efs.get_disk_inode_pos(0);
         get_block_cache(root_inode_block_id as usize, block_device.clone())
             .lock()
-            .modify(0, |disk_inode: &mut DiskInode| {
+            .modify(root_inode_offset, |disk_inode: &mut DiskInode| {
                 disk_inode.initialize(DiskInodeType::Directory);
             });
         // write back immediately
@@ -143,6 +143,8 @@ impl EasyFileSystem {
 
     // 释放指定的 data block
     pub fn dealloc_data(&mut self, block_id: u32) {
+        // TEMP(justxuewei):
+        // - 检查 block_id 是否是在 write_at 写入的 block_id
         // erase data from data area
         get_block_cache(block_id as usize, self.block_device.clone())
             .lock()

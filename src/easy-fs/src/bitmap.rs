@@ -31,8 +31,7 @@ impl Bitmap {
         }
     }
 
-    // 在 bitmap 中找到一个空闲位置并标记占用，返回 inode id，
-    // inode 的 block id 应该是 inode_area_start_block + inode_id / (BLOCK_SIZE / sizeof(DiskInode))
+    // 在 bitmap 中找到一个空闲位置并标记占用，返回 (inode/data) area 的 block id
     pub fn alloc(&self, block_device: Arc<dyn BlockDevice>) -> Option<usize> {
         // iterate all bitmap blocks
         for bitmap_block_id in 0..self.blocks {
@@ -49,6 +48,12 @@ impl Bitmap {
 
                     if let Some((pos, inner_pos)) = pair {
                         bitmap_block[pos] |= 1 << inner_pos;
+                        // TEMP(justxuewei):
+                        // - bitmap_block_id + self.start_block_id 是 bitmap 所
+                        //   在的 block id；
+                        // - pos 是 bitmap block 内部的 bitmap id；
+                        // - inner_pos 是 bitmap 内部的偏移量；
+                        // - 观察 bitmap_block[pos] 的哪个位置置为 1。
                         return Some(
                             (bitmap_block_id * BLOCK_BITS + pos * BITMAP_SIZE + inner_pos) as usize,
                         );
@@ -64,13 +69,12 @@ impl Bitmap {
 
     pub fn dealloc(&self, block_device: Arc<dyn BlockDevice>, bit: usize) {
         let (block_id, bitmap_pos, bit_pos) = decomposition(bit);
-        get_block_cache(block_id, block_device).lock().modify(
-            0,
-            |bitmap_block: &mut BitmapBlock| {
-                assert!(bitmap_block[bitmap_pos] & (1u64 << bit_pos) > 0);
+        get_block_cache(block_id + self.start_block_id, block_device)
+            .lock()
+            .modify(0, |bitmap_block: &mut BitmapBlock| {
+                assert!((bitmap_block[bitmap_pos] & (1u64 << bit_pos)) > 0);
                 bitmap_block[bitmap_pos] -= 1u64 << bit_pos;
-            },
-        );
+            });
     }
 
     pub fn maximum(&self) -> usize {
