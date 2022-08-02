@@ -136,8 +136,9 @@ impl DiskInode {
         let mut total = data_blocks;
         if data_blocks > DIRECT_BOUND {
             total += 1;
-        } else if data_blocks > INDIRECT1_BOUND {
-            total += 2;
+        }
+        if data_blocks > INDIRECT1_BOUND {
+            total += 1;
             total +=
                 (data_blocks - INDIRECT1_BOUND + INODE_INDIRECT1_COUNT - 1) / INODE_INDIRECT1_COUNT;
         }
@@ -241,7 +242,7 @@ impl DiskInode {
             self.direct[current_block] = 0;
             current_block += 1;
         }
-        if current_block <= INODE_DIRECT_COUNT {
+        if data_blocks <= INODE_DIRECT_COUNT {
             return v;
         }
         // indirect1
@@ -258,7 +259,7 @@ impl DiskInode {
                 }
             });
         self.indirect1 = 0;
-        if current_block <= INODE_INDIRECT1_COUNT {
+        if data_blocks <= INODE_INDIRECT1_COUNT {
             return v;
         }
         // indirect2
