@@ -151,7 +151,7 @@ impl TaskControlBlock {
 
     pub fn exec(&self, elf_data: &[u8]) {
         let (mmset, user_sp, entrypoint) = MemorySet::from_elf(elf_data);
-        
+
         let trap_cx_ppn = mmset
             .translate(VirtAddr::from(config::TRAP_CONTEXT).into())
             .unwrap()

@@ -15,3 +15,7 @@ pub const TRAP_CONTEXT: usize = TRAMPOLINE - PAGE_SIZE;
 
 // CLOCK_FREQ is clock frequency, in this case, the value is for qemu.
 pub const CLOCK_FREQ: usize = 12500000;
+
+// MMIO for QEMU
+// the first one is started address, the second one is length
+pub const MMIO: &[(usize, usize)] = &[(0x10001000, 0x1000)];

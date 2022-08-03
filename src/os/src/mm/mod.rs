@@ -1,10 +1,11 @@
-mod heap_allocator;
 pub mod address;
-pub mod page_table;
 mod frame_allocator;
+mod heap_allocator;
 pub mod memory_set;
+pub mod page_table;
 
 pub use memory_set::KERNEL_SPACE;
+pub use page_table::UserBuffer;
 
 pub fn init() {
     heap_allocator::init_heap();

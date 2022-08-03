@@ -262,6 +262,21 @@ impl MemorySet {
         );
         memory_set.push(phy_mem_map_area, None);
 
+        println!("mapping memory-mapped registers");
+        for (started_address, length) in config::MMIO {
+            let start_va: VirtAddr = (*started_address).into();
+            let end_va: VirtAddr = (*started_address + *length).into();
+            memory_set.push(
+                MapArea::new(
+                    start_va,
+                    end_va,
+                    MapType::Identical,
+                    MapPermission::R | MapPermission::W,
+                ),
+                None,
+            );
+        }
+
         println!("kernel's memory set was loaded");
 
         memory_set

@@ -12,7 +12,7 @@ use crate::{loader, task::task::TaskControlBlock};
 
 pub use {context::TaskContext, processor::run_tasks};
 
-use self::{task::TaskStatus};
+use self::task::TaskStatus;
 
 const INITPROC_NAME: &str = "initproc";
 
@@ -52,7 +52,7 @@ pub fn exit_current_and_run_next(exit_code: i32) {
     }
     current_task_inner.children.clear();
     current_task_inner.memory_set.release_areas();
-    
+
     drop(initproc_inner);
     drop(current_task_inner);
     drop(current_task);

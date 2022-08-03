@@ -84,10 +84,8 @@ pub fn sys_waitpid(pid: isize, exit_code_ptr: *mut i32) -> isize {
         assert_eq!(Arc::strong_count(&child), 1);
         let child_pid = child.getpid();
         let exit_code = child.inner_exclusive_access().exit_code;
-        *(page_table::translated_ref_mut(
-            current_task_inner.get_user_token(),
-            exit_code_ptr,
-        )) = exit_code;
+        *(page_table::translated_ref_mut(current_task_inner.get_user_token(), exit_code_ptr)) =
+            exit_code;
         return child_pid as isize;
     }
 

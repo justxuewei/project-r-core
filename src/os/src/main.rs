@@ -8,18 +8,18 @@
 // Ref: https://doc.rust-lang.org/reference/macros-by-example.html#the-macro_use-attribute
 #[macro_use]
 mod console;
+mod config;
+mod drivers;
+pub mod fs;
 mod lang_items;
+mod loader;
+mod mm;
 mod sbi;
 mod sync;
 pub mod syscall;
-pub mod trap;
-
-mod config;
-mod loader;
 mod task;
 mod timer;
-
-mod mm;
+pub mod trap;
 
 #[macro_use]
 extern crate alloc;
@@ -37,7 +37,7 @@ fn rust_main() -> ! {
 
     println!("[kernel] Welcome to rCore!");
     mm::init();
-    task::add_initproc(); 
+    task::add_initproc();
     trap::init();
     trap::enable_timer_interrupt();
     timer::set_next_trigger();
@@ -54,8 +54,8 @@ fn clear_bss() {
     }
 
     (sbss as usize..ebss as usize).for_each(|a| {
-        // Performs a volatile write of a memory location with 
-        // the given value without reading or dropping the old 
+        // Performs a volatile write of a memory location with
+        // the given value without reading or dropping the old
         // value.
         // Ref: https://doc.rust-lang.org/std/ptr/fn.write_volatile.html
         unsafe { (a as *mut u8).write_volatile(0) }

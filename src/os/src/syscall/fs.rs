@@ -1,4 +1,8 @@
-use crate::{mm::page_table, task::{processor, self}, sbi};
+use crate::{
+    mm::page_table,
+    sbi,
+    task::{self, processor},
+};
 
 const FD_STDIN: usize = 0;
 const FD_STDOUT: usize = 1;
@@ -39,11 +43,8 @@ pub fn sys_read(fd: usize, buf: *const u8, len: usize) -> isize {
             }
 
             let ch = c as u8;
-            let mut buffers = page_table::translated_byte_buffer(
-                processor::current_user_token(),
-                buf,
-                len,
-            );
+            let mut buffers =
+                page_table::translated_byte_buffer(processor::current_user_token(), buf, len);
             unsafe {
                 buffers[0].as_mut_ptr().write_volatile(ch);
             }
