@@ -150,7 +150,7 @@ impl PageTable {
         self.find_pte(vpn).map(|pte| *pte)
     }
 
-    fn translate_va(&self, va: VirtAddr) -> Option<PhysAddr> {
+    pub fn translate_va(&self, va: VirtAddr) -> Option<PhysAddr> {
         self.find_pte(va.clone().floor()).map(|pte| {
             let phys_addr: PhysAddr = pte.ppn().into();
             let phys_addr_usize: usize = phys_addr.into();

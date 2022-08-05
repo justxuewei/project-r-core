@@ -19,7 +19,7 @@ use crate::{
         KERNEL_SPACE,
     },
     sync::UPSafeCell,
-    trap::{self, trap_handler, TrapContext},
+    trap::{self, trap_handler, TrapContext}, fs::File,
 };
 
 pub struct TaskControlBlock {
@@ -41,6 +41,8 @@ pub struct TaskControlBlockInner {
     pub children: Vec<Arc<TaskControlBlock>>,
 
     pub exit_code: i32,
+
+    pub fd_table: Vec<Option<Arc<dyn File + Send + Sync>>>,
 }
 
 impl TaskControlBlockInner {
@@ -85,6 +87,8 @@ impl TaskControlBlock {
                 parent: None,
                 children: Vec::new(),
                 exit_code: 0,
+                // TODO(justxuewei): add stdin, stdout & stderr
+                // fd_table: vec![Some(Arc::new(Stdin))]
             })
         };
 

@@ -33,6 +33,11 @@ lazy_static! {
         Arc::new(unsafe { UPSafeCell::new(MemorySet::new_kernel()) });
 }
 
+// Get kernel space root ppn
+pub fn kernel_token() -> usize {
+    KERNEL_SPACE.exclusive_access().token()
+}
+
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum MapType {
     Identical, // 一个 VPN 唯一的映射一个 PPN，比如内核就需要访问物理内存中的某个 PPN

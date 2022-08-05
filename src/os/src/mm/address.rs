@@ -12,8 +12,10 @@ const PPN_WIDTH_SV39: usize = PA_WIDTH_SV39 - config::PAGE_SIZE_BITS;
 // VPN = Virtual Page Number
 const VPN_WIDTH_SV39: usize = VA_WIDTH_SV39 - config::PAGE_SIZE_BITS;
 
+#[repr(C)]
 #[derive(Clone, Copy, PartialEq, PartialOrd, Ord, Eq)]
 pub struct PhysAddr(pub usize);
+#[repr(C)]
 #[derive(Clone, Copy, PartialEq, PartialOrd, Ord, Eq)]
 pub struct PhysPageNum(pub usize);
 
@@ -73,8 +75,10 @@ impl PhysPageNum {
     }
 }
 
+#[repr(C)]
 #[derive(Clone, Copy, PartialEq, PartialOrd, Ord, Eq)]
 pub struct VirtAddr(pub usize);
+#[repr(C)]
 #[derive(Clone, Copy, PartialEq, PartialOrd, Ord, Eq)]
 pub struct VirtPageNum(pub usize);
 
@@ -201,6 +205,12 @@ impl From<VirtPageNum> for VirtAddr {
 
 pub trait StepByOne {
     fn step(&mut self);
+}
+
+impl StepByOne for PhysPageNum {
+    fn step(&mut self) {
+        self.0 += 1;
+    }
 }
 
 impl StepByOne for VirtPageNum {
