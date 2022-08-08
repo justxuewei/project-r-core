@@ -74,10 +74,12 @@ fn easy_fs_pack() -> std::io::Result<()> {
         .into_iter()
         .map(|dir_entry| {
             let mut name_with_ext = dir_entry.unwrap().file_name().into_string().unwrap();
+            println!("name_with_ext: {}", name_with_ext);
             name_with_ext.drain(name_with_ext.find('.').unwrap()..name_with_ext.len());
             name_with_ext
         })
         .collect();
+    println!("{:?}", apps);
     for app in apps {
         // load app data from host file system
         let mut host_file = File::open(format!("{}{}", target_path, app)).unwrap();

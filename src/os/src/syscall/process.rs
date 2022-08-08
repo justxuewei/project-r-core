@@ -2,7 +2,6 @@ use alloc::sync::Arc;
 
 use crate::{
     fs::{inode::OpenFlags, open_file},
-    loader,
     mm::page_table,
     task::{self, manager, processor},
     timer,
