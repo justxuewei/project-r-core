@@ -1,6 +1,10 @@
 use crate::mm::UserBuffer;
 
-mod inode;
+pub mod inode;
+pub mod stdio;
+
+pub use inode::open_file;
+pub use stdio::{Stdin, Stdout};
 
 pub trait File: Send + Sync {
     fn readable(&self) -> bool;

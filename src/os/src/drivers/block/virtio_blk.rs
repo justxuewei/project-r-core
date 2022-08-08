@@ -3,7 +3,16 @@ use easy_fs::BlockDevice;
 use lazy_static::*;
 use virtio_drivers::{VirtIOBlk, VirtIOHeader};
 
-use crate::{mm::{FrameTracker, address::{PhysAddr, PhysPageNum, StepByOne, VirtAddr}, frame_allocator::{frame_alloc, frame_dealloc}, page_table::PageTable, memory_set::kernel_token}, sync::UPSafeCell};
+use crate::{
+    mm::{
+        address::{PhysAddr, PhysPageNum, StepByOne, VirtAddr},
+        frame_allocator::{frame_alloc, frame_dealloc},
+        memory_set::kernel_token,
+        page_table::PageTable,
+        FrameTracker,
+    },
+    sync::UPSafeCell,
+};
 
 // 参见 config::MMIO
 const VIRTIO0: usize = 0x10001000;

@@ -1,6 +1,7 @@
 use alloc::sync::Arc;
 
 use crate::{
+    fs::{inode::OpenFlags, open_file},
     loader,
     mm::page_table,
     task::{self, manager, processor},
@@ -45,9 +46,10 @@ pub fn sys_fork() -> isize {
 
 pub fn sys_exec(path: *const u8) -> isize {
     let token = processor::current_user_token();
-    let path = page_table::translated_str(token, path);
-    if let Some(data) = loader::get_app_data_by_name(path.as_str()) {
-        processor::current_task().unwrap().exec(data);
+    let app_name = page_table::translated_str(token, path);
+    if let Some(inode) = open_file(app_name.as_str(), OpenFlags::READ_ONLY) {
+        let data = inode.read_all();
+        processor::current_task().unwrap().exec(data.as_slice());
         return 0;
     }
     -1

@@ -12,6 +12,7 @@ use super::{
 
 use crate::{
     config,
+    fs::{File, Stdin, Stdout},
     mm::{
         self,
         address::{PhysPageNum, VirtAddr},
@@ -19,7 +20,7 @@ use crate::{
         KERNEL_SPACE,
     },
     sync::UPSafeCell,
-    trap::{self, trap_handler, TrapContext}, fs::File,
+    trap::{self, trap_handler, TrapContext},
 };
 
 pub struct TaskControlBlock {
@@ -58,6 +59,14 @@ impl TaskControlBlockInner {
     pub fn is_zombie(&self) -> bool {
         self.get_status() == TaskStatus::Zombie
     }
+    pub fn alloc_fd(&mut self) -> usize {
+        if let Some(fd) = (0..self.fd_table.len()).find(|fd| self.fd_table[*fd].is_none()) {
+            fd
+        } else {
+            self.fd_table.push(None);
+            self.fd_table.len() - 1
+        }
+    }
 }
 
 impl TaskControlBlock {
@@ -87,8 +96,14 @@ impl TaskControlBlock {
                 parent: None,
                 children: Vec::new(),
                 exit_code: 0,
-                // TODO(justxuewei): add stdin, stdout & stderr
-                // fd_table: vec![Some(Arc::new(Stdin))]
+                fd_table: vec![
+                    // 0 -> stdin
+                    Some(Arc::new(Stdin)),
+                    // 1 -> stdout
+                    Some(Arc::new(Stdout)),
+                    // 2 -> stderr
+                    Some(Arc::new(Stdout)),
+                ],
             })
         };
 
@@ -128,6 +143,15 @@ impl TaskControlBlock {
             .translate(VirtAddr::from(config::TRAP_CONTEXT).into())
             .unwrap()
             .ppn();
+        // copy fd table
+        let mut new_fd_table: Vec<Option<Arc<dyn File + Send + Sync>>> = Vec::new();
+        for fd in parent_inner.fd_table.iter() {
+            if let Some(file) = fd {
+                new_fd_table.push(Some(file.clone()));
+            } else {
+                new_fd_table.push(None);
+            }
+        }
         let tcb_inner = TaskControlBlockInner {
             trap_cx_ppn,
             base_size: parent_inner.base_size,
@@ -137,6 +161,7 @@ impl TaskControlBlock {
             parent: Some(Arc::downgrade(self)),
             children: Vec::new(),
             exit_code: 0,
+            fd_table: new_fd_table,
         };
 
         let tcb = Arc::new(TaskControlBlock {

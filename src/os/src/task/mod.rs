@@ -8,7 +8,10 @@ mod task;
 use alloc::sync::Arc;
 use lazy_static::*;
 
-use crate::{loader, task::task::TaskControlBlock};
+use crate::{
+    fs::{inode::OpenFlags, open_file},
+    task::task::TaskControlBlock,
+};
 
 pub use {context::TaskContext, processor::run_tasks};
 
@@ -18,9 +21,10 @@ const INITPROC_NAME: &str = "initproc";
 
 lazy_static! {
     pub static ref INITPROC: Arc<TaskControlBlock> = {
-        Arc::new(TaskControlBlock::new(
-            loader::get_app_data_by_name(INITPROC_NAME).unwrap(),
-        ))
+        let initproc_data = open_file(INITPROC_NAME, OpenFlags::READ_ONLY)
+            .unwrap()
+            .read_all();
+        Arc::new(TaskControlBlock::new(initproc_data.as_slice()))
     };
 }
 

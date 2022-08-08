@@ -4,9 +4,9 @@ mod heap_allocator;
 pub mod memory_set;
 pub mod page_table;
 
+pub use frame_allocator::FrameTracker;
 pub use memory_set::KERNEL_SPACE;
 pub use page_table::UserBuffer;
-pub use frame_allocator::FrameTracker;
 
 pub fn init() {
     heap_allocator::init_heap();

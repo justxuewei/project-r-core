@@ -1,8 +1,9 @@
 use alloc::{sync::Arc, vec::Vec};
-use easy_fs::{Inode, BLOCK_SIZE, EasyFileSystem};
+use bitflags::*;
+use easy_fs::{EasyFileSystem, Inode, BLOCK_SIZE};
 use lazy_static::*;
 
-use crate::{sync::UPSafeCell, mm::UserBuffer, drivers::block::BLOCK_DEVICE};
+use crate::{drivers::block::BLOCK_DEVICE, mm::UserBuffer, sync::UPSafeCell};
 
 use super::File;
 
@@ -13,6 +14,12 @@ lazy_static! {
     };
 }
 
+// 为什么要再做一次 OSInode 封装？
+// 主要的原因有两个：
+// 1. 操作系统读写 inode 的时候需要有权限控制，比如可读性和可写性等，这需要在
+//    OSInode 中进行控制；
+// 2. 操作系统在读写文件的时候需要维护一个 offset 表示当前文件已经读到哪里了；
+// 3. 操作系统需要确保 inode 的访问是无并发的，即一个文件不能同时被两个进程写。
 pub struct OSInode {
     readable: bool,
     writable: bool,
@@ -84,4 +91,61 @@ impl File for OSInode {
     fn writable(&self) -> bool {
         self.writable
     }
+}
+
+pub fn list_apps() {
+    println!("/***** List Apps *****");
+    for app in ROOT_INODE.ls() {
+        println!("{}", app);
+    }
+    println!("*****/");
+}
+
+bitflags! {
+    pub struct OpenFlags: u32 {
+        const READ_ONLY = 0;
+        const WRITE_ONLY = 1 << 0;
+        const READ_WRITE = 1 << 1;
+        const CREATE = 1 << 9;
+        const TRUNCATE = 1 << 10;
+    }
+}
+
+impl OpenFlags {
+    // 检查 OpenFlags 目前的读写状态，第一个返回值表示可读性，第二个表示可写性
+    pub fn read_write(&self) -> (bool, bool) {
+        if self.is_empty() {
+            (true, false)
+        } else if self.contains(Self::WRITE_ONLY) {
+            (false, true)
+        } else {
+            (true, true)
+        }
+    }
+}
+
+pub fn open_file(name: &str, flags: OpenFlags) -> Option<Arc<OSInode>> {
+    let (readable, writable) = flags.read_write();
+    // flags == CREATE
+    if flags.contains(OpenFlags::CREATE) {
+        // 文件已经存在
+        if let Some(inode) = ROOT_INODE.find(name) {
+            inode.clear();
+            return Some(Arc::new(OSInode::new(readable, writable, inode)));
+        }
+        // 文件不存在，创建文件
+        return ROOT_INODE
+            .create(name)
+            .map(|inode| Arc::new(OSInode::new(readable, writable, inode)));
+    }
+
+    // flags == TRUNCATE
+    if flags.contains(OpenFlags::TRUNCATE) {
+        return ROOT_INODE.find(name).map(|inode| {
+            inode.clear();
+            Arc::new(OSInode::new(readable, writable, inode))
+        });
+    }
+
+    None
 }

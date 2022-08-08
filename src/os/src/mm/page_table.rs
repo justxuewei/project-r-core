@@ -170,6 +170,7 @@ impl PageTable {
 // 将 token 地址空间的数据保存到 Vec 缓冲区中，ptr 是 token 地址空间的虚拟地址。
 // 一个页框本身是一个数组 `&'static mut [u8]`，如果 len 横跨多
 // 个页框，那么就整体的数据结果就是 `Vec<&'static mut [u8]>`。
+// 另外，这里返回的是一个可变引用，这里是可以直接修改其中的数据的。
 pub fn translated_byte_buffer(token: usize, ptr: *const u8, len: usize) -> Vec<&'static mut [u8]> {
     let page_table = PageTable::from_token(token);
     let mut start = ptr as usize;
