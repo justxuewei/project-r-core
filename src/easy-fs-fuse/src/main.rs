@@ -1,6 +1,7 @@
 use std::{
     fs::{read_dir, File, OpenOptions},
     io::{Read, Seek, SeekFrom, Write},
+    path::Path,
     sync::{Arc, Mutex},
 };
 
@@ -61,7 +62,7 @@ fn easy_fs_pack() -> std::io::Result<()> {
             .read(true)
             .write(true)
             .create(true)
-            .open(format!("{}{}", target_path, "fs.img"))?;
+            .open(Path::new(target_path).join("fs.img").to_str().unwrap())?;
         f.set_len(16 * 2048 * 512).unwrap();
         f
     })));
@@ -74,15 +75,19 @@ fn easy_fs_pack() -> std::io::Result<()> {
         .into_iter()
         .map(|dir_entry| {
             let mut name_with_ext = dir_entry.unwrap().file_name().into_string().unwrap();
-            println!("name_with_ext: {}", name_with_ext);
             name_with_ext.drain(name_with_ext.find('.').unwrap()..name_with_ext.len());
             name_with_ext
         })
         .collect();
-    println!("{:?}", apps);
+    println!("apps: {:?}", apps);
     for app in apps {
         // load app data from host file system
-        let mut host_file = File::open(format!("{}{}", target_path, app)).unwrap();
+        println!(
+            "app path: {}",
+            Path::new(target_path).join(app.as_str()).to_str().unwrap()
+        );
+        let mut host_file =
+            File::open(Path::new(target_path).join(app.as_str()).to_str().unwrap()).unwrap();
         let mut all_data: Vec<u8> = Vec::new();
         host_file.read_to_end(&mut all_data).unwrap();
         // create a file in easy-fs
@@ -91,6 +96,7 @@ fn easy_fs_pack() -> std::io::Result<()> {
         inode.write_at(0, all_data.as_slice());
     }
     // list apps
+    println!("List apps in root directory");
     for app in root_inode.ls() {
         println!("{}", app);
     }

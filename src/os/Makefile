@@ -1,9 +1,9 @@
 CURDIR := $(shell pwd)
 RUST_TARGET := riscv64gc-unknown-none-elf
 
-BOOTLOADER_DIR := $(CURDIR)/../../bootloader
-TARGET_DIR := $(CURDIR)/target
-USER_DIR := $(CURDIR)/../user/target
+BOOTLOADER_DIR := ../../bootloader
+TARGET_DIR := target
+USER_DIR := ../user/target
 
 QEMU_BOOTLOADER := $(BOOTLOADER_DIR)/rustsbi-qemu.bin
 
@@ -35,7 +35,7 @@ qemu: $(OS_OUTPUT) $(OS_BIN_OUTPUT)
 		-machine virt \
 		-nographic \
 		-bios $(QEMU_BOOTLOADER) \
-		-device loader,file=$(OS_BIN_OUTPUT),addr=0x80200000
+		-device loader,file=$(OS_BIN_OUTPUT),addr=0x80200000 \
 		-drive file=$(FILESYSTEM_IMG),if=none,format=raw,id=x0 \
 		-device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0
 

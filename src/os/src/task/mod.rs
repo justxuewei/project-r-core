@@ -9,7 +9,7 @@ use alloc::sync::Arc;
 use lazy_static::*;
 
 use crate::{
-    fs::{inode::OpenFlags, open_file},
+    fs::{inode::{OpenFlags, ROOT_INODE}, open_file},
     task::task::TaskControlBlock,
 };
 

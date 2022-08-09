@@ -22,7 +22,7 @@ ifeq (, $(wildcard $(EASY_FS_FUSE_TARGET)/easy-fs-fuse))
 	@echo "easy-fs-fuse not found"
 	@exit 1
 endif
-	@$(EASY_FS_FUSE_TARGET)/easy-fs-fuse -s $(shell pwd)/$(TARGET_DIR) -t $(shell pwd)/$(TARGET_DIR)/fs.img
+	@$(EASY_FS_FUSE_TARGET)/easy-fs-fuse -s $(APP_DIR) -t $(TARGET_DIR)
 
 
 clean:

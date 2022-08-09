@@ -139,13 +139,11 @@ pub fn open_file(name: &str, flags: OpenFlags) -> Option<Arc<OSInode>> {
             .map(|inode| Arc::new(OSInode::new(readable, writable, inode)));
     }
 
-    // flags == TRUNCATE
-    if flags.contains(OpenFlags::TRUNCATE) {
-        return ROOT_INODE.find(name).map(|inode| {
+    ROOT_INODE.find(name).map(|inode| {
+        // flags == TRUNCATE
+        if flags.contains(OpenFlags::TRUNCATE) {
             inode.clear();
-            Arc::new(OSInode::new(readable, writable, inode))
-        });
-    }
-
-    None
+        }
+        Arc::new(OSInode::new(readable, writable, inode))
+    })
 }
