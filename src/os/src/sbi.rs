@@ -14,7 +14,7 @@ const SBI_SHUTDOWN: usize = 8;
 
 // #[inline(always)] 将代码在各个 crate 复制一份，优势是执行速度快，不足是
 // 编译时间长且二进制文件体积大。
-// Ref: 
+// Ref:
 //  - https://internals.rust-lang.org/t/when-should-i-use-inline/598
 //  - https://nnethercote.github.io/perf-book/inlining.html
 #[inline(always)]

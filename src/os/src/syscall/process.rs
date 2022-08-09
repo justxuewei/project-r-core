@@ -1,7 +1,7 @@
 use alloc::sync::Arc;
 
 use crate::{
-    loader,
+    fs::{inode::OpenFlags, open_file},
     mm::page_table,
     task::{self, manager, processor},
     timer,
@@ -45,9 +45,10 @@ pub fn sys_fork() -> isize {
 
 pub fn sys_exec(path: *const u8) -> isize {
     let token = processor::current_user_token();
-    let path = page_table::translated_str(token, path);
-    if let Some(data) = loader::get_app_data_by_name(path.as_str()) {
-        processor::current_task().unwrap().exec(data);
+    let app_name = page_table::translated_str(token, path);
+    if let Some(inode) = open_file(app_name.as_str(), OpenFlags::READ_ONLY) {
+        let data = inode.read_all();
+        processor::current_task().unwrap().exec(data.as_slice());
         return 0;
     }
     -1
@@ -84,10 +85,8 @@ pub fn sys_waitpid(pid: isize, exit_code_ptr: *mut i32) -> isize {
         assert_eq!(Arc::strong_count(&child), 1);
         let child_pid = child.getpid();
         let exit_code = child.inner_exclusive_access().exit_code;
-        *(page_table::translated_ref_mut(
-            current_task_inner.get_user_token(),
-            exit_code_ptr,
-        )) = exit_code;
+        *(page_table::translated_ref_mut(current_task_inner.get_user_token(), exit_code_ptr)) =
+            exit_code;
         return child_pid as isize;
     }
 

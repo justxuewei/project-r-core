@@ -150,7 +150,7 @@ impl PageTable {
         self.find_pte(vpn).map(|pte| *pte)
     }
 
-    fn translate_va(&self, va: VirtAddr) -> Option<PhysAddr> {
+    pub fn translate_va(&self, va: VirtAddr) -> Option<PhysAddr> {
         self.find_pte(va.clone().floor()).map(|pte| {
             let phys_addr: PhysAddr = pte.ppn().into();
             let phys_addr_usize: usize = phys_addr.into();
@@ -170,6 +170,7 @@ impl PageTable {
 // 将 token 地址空间的数据保存到 Vec 缓冲区中，ptr 是 token 地址空间的虚拟地址。
 // 一个页框本身是一个数组 `&'static mut [u8]`，如果 len 横跨多
 // 个页框，那么就整体的数据结果就是 `Vec<&'static mut [u8]>`。
+// 另外，这里返回的是一个可变引用，这里是可以直接修改其中的数据的。
 pub fn translated_byte_buffer(token: usize, ptr: *const u8, len: usize) -> Vec<&'static mut [u8]> {
     let page_table = PageTable::from_token(token);
     let mut start = ptr as usize;
@@ -219,4 +220,61 @@ pub fn translated_ref_mut<T>(token: usize, ptr: *const T) -> &'static mut T {
         .translate_va(VirtAddr::from(ptr as usize))
         .unwrap()
         .get_mut()
+}
+
+pub struct UserBuffer {
+    pub buffers: Vec<&'static mut [u8]>,
+}
+
+impl UserBuffer {
+    // 参见 translated_byte_buffer() 函数
+    // &'static mut [u8] 表示的是一个页帧，他不需要被编译器回收，所以作用域是 static
+    pub fn new(buffers: Vec<&'static mut [u8]>) -> UserBuffer {
+        UserBuffer { buffers }
+    }
+
+    pub fn len(&self) -> usize {
+        let mut total = 0usize;
+        for buf in self.buffers.iter() {
+            total += buf.len();
+        }
+        total
+    }
+}
+
+impl IntoIterator for UserBuffer {
+    type Item = *mut u8;
+    type IntoIter = UserBufferIterator;
+
+    fn into_iter(self) -> Self::IntoIter {
+        UserBufferIterator {
+            buffers: self.buffers,
+            current_buffer: 0,
+            current_idx: 0,
+        }
+    }
+}
+
+pub struct UserBufferIterator {
+    buffers: Vec<&'static mut [u8]>,
+    current_buffer: usize,
+    current_idx: usize,
+}
+
+impl Iterator for UserBufferIterator {
+    type Item = *mut u8;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.current_buffer >= self.buffers.len() {
+            return None;
+        }
+        let byte = &mut self.buffers[self.current_buffer][self.current_idx] as *mut _;
+        if self.current_idx + 1 == self.buffers[self.current_buffer].len() {
+            self.current_buffer += 1;
+            self.current_idx = 0;
+        } else {
+            self.current_idx += 1;
+        }
+        Some(byte)
+    }
 }

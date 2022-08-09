@@ -33,6 +33,11 @@ lazy_static! {
         Arc::new(unsafe { UPSafeCell::new(MemorySet::new_kernel()) });
 }
 
+// Get kernel space root ppn
+pub fn kernel_token() -> usize {
+    KERNEL_SPACE.exclusive_access().token()
+}
+
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum MapType {
     Identical, // 一个 VPN 唯一的映射一个 PPN，比如内核就需要访问物理内存中的某个 PPN
@@ -261,6 +266,21 @@ impl MemorySet {
             MapPermission::R | MapPermission::W,
         );
         memory_set.push(phy_mem_map_area, None);
+
+        println!("mapping memory-mapped registers");
+        for (started_address, length) in config::MMIO {
+            let start_va: VirtAddr = (*started_address).into();
+            let end_va: VirtAddr = (*started_address + *length).into();
+            memory_set.push(
+                MapArea::new(
+                    start_va,
+                    end_va,
+                    MapType::Identical,
+                    MapPermission::R | MapPermission::W,
+                ),
+                None,
+            );
+        }
 
         println!("kernel's memory set was loaded");
 

@@ -8,19 +8,26 @@ mod task;
 use alloc::sync::Arc;
 use lazy_static::*;
 
-use crate::{loader, task::task::TaskControlBlock};
+use crate::{
+    fs::{
+        inode::{OpenFlags, ROOT_INODE},
+        open_file,
+    },
+    task::task::TaskControlBlock,
+};
 
 pub use {context::TaskContext, processor::run_tasks};
 
-use self::{task::TaskStatus};
+use self::task::TaskStatus;
 
 const INITPROC_NAME: &str = "initproc";
 
 lazy_static! {
     pub static ref INITPROC: Arc<TaskControlBlock> = {
-        Arc::new(TaskControlBlock::new(
-            loader::get_app_data_by_name(INITPROC_NAME).unwrap(),
-        ))
+        let initproc_data = open_file(INITPROC_NAME, OpenFlags::READ_ONLY)
+            .unwrap()
+            .read_all();
+        Arc::new(TaskControlBlock::new(initproc_data.as_slice()))
     };
 }
 
@@ -52,7 +59,7 @@ pub fn exit_current_and_run_next(exit_code: i32) {
     }
     current_task_inner.children.clear();
     current_task_inner.memory_set.release_areas();
-    
+
     drop(initproc_inner);
     drop(current_task_inner);
     drop(current_task);
