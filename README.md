@@ -19,10 +19,10 @@ In this repo:
 
 Reviews (in chinese):
 
-- [address space](https://nxw.name/2022/address-space-introduction)
+- [Project rCore: 地址空间](https://nxw.name/2022/address-space-introduction)
 - [Project rCore: 地址空间](https://nxw.name/2022/address-space-introduction)
 - [Project rCore: 进程](https://nxw.name/2022/project-rcore-process)
-- [rCore: 文件系统](https://nxw.name/2022/project-rcore-file-system)
+- [Project rCore: 文件系统](https://nxw.name/2022/project-rcore-file-system)
 
 ## Tips
 
