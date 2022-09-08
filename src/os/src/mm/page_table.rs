@@ -214,6 +214,7 @@ pub fn translated_str(token: usize, ptr: *const u8) -> String {
     string
 }
 
+/// 翻译 *const T 类型为制定 token 下的 &'static mut T 类型
 pub fn translated_ref_mut<T>(token: usize, ptr: *const T) -> &'static mut T {
     let page_table = PageTable::from_token(token);
     page_table

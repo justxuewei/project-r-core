@@ -1,5 +1,6 @@
 use core::arch::asm;
 
+const SYSCALL_PIPE: usize = 59;
 const SYSCALL_READ: usize = 63;
 const SYSCALL_WRITE: usize = 64;
 const SYSCALL_EXIT: usize = 93;
@@ -64,4 +65,8 @@ pub fn sys_read(fd: usize, buffer: &mut [u8]) -> isize {
         SYSCALL_READ,
         [fd, buffer.as_mut_ptr() as usize, buffer.len()],
     )
+}
+
+pub fn sys_pipe(pipe: &mut [usize]) -> isize {
+    syscall(SYSCALL_PIPE, [pipe.as_mut_ptr() as usize, 0, 0])
 }
