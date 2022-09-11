@@ -12,7 +12,7 @@ fn main() -> i32 {
     if fork() == 0 {
         // child process
         println!("[initproc] User shell will be started.");
-        exec("user_shell\0");
+        exec("user_shell\0", &[core::ptr::null::<u8>()]);
     } else {
         // parent process
         println!("[initproc] Waiting for user shell to exit.");

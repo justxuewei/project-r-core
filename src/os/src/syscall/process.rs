@@ -1,4 +1,4 @@
-use alloc::sync::Arc;
+use alloc::{string::String, sync::Arc, vec::Vec};
 
 use crate::{
     fs::{inode::OpenFlags, open_file},
@@ -43,13 +43,29 @@ pub fn sys_fork() -> isize {
     child_pid as isize
 }
 
-pub fn sys_exec(path: *const u8) -> isize {
+/// exec syscall，
+/// path 表示用户程序的地址（目前只能是名字），
+/// args 表示用户程序的参数，类型是 [&str]，数据为 0 表明没有更多的参数了
+pub fn sys_exec(path: *const u8, mut args: *const usize) -> isize {
     let token = processor::current_user_token();
     let app_name = page_table::translated_str(token, path);
+    // args
+    let mut args_vec: Vec<String> = Vec::new();
+    loop {
+        let arg_str_ptr = *page_table::translated_ref(token, args);
+        if arg_str_ptr == 0 {
+            break;
+        }
+        args_vec.push(page_table::translated_str(token, arg_str_ptr as *const u8));
+        unsafe { args = args.add(1) }
+    }
     if let Some(inode) = open_file(app_name.as_str(), OpenFlags::READ_ONLY) {
         let data = inode.read_all();
-        processor::current_task().unwrap().exec(data.as_slice());
-        return 0;
+        let argc = args_vec.len();
+        processor::current_task()
+            .unwrap()
+            .exec(data.as_slice(), args_vec);
+        return argc as isize;
     }
     -1
 }

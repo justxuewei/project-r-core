@@ -203,7 +203,7 @@ pub fn translated_str(token: usize, ptr: *const u8) -> String {
         let ch: u8 = *(page_table
             .translate_va(VirtAddr::from(va))
             .unwrap()
-            .get_mut());
+            .get_ref());
         if ch == 0 {
             break;
         } else {
@@ -214,13 +214,22 @@ pub fn translated_str(token: usize, ptr: *const u8) -> String {
     string
 }
 
-/// 翻译 *const T 类型为制定 token 下的 &'static mut T 类型
-pub fn translated_ref_mut<T>(token: usize, ptr: *const T) -> &'static mut T {
+/// 翻译 *mut T 类型（token 下虚拟地址）为的 &'static mut T 类型，
+pub fn translated_ref_mut<T>(token: usize, ptr: *mut T) -> &'static mut T {
     let page_table = PageTable::from_token(token);
     page_table
         .translate_va(VirtAddr::from(ptr as usize))
         .unwrap()
         .get_mut()
+}
+
+/// 翻译 *const T 类型（token 下虚拟地址）为的 &'static T 类型
+pub fn translated_ref<T>(token: usize, ptr: *const T) -> &'static T {
+    let page_table = PageTable::from_token(token);
+    page_table
+        .translate_va(VirtAddr::from(ptr as usize))
+        .unwrap()
+        .get_ref()
 }
 
 pub struct UserBuffer {

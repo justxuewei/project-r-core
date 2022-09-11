@@ -13,8 +13,42 @@ const DL: u8 = 0x7fu8;
 const BS: u8 = 0x08u8;
 
 use alloc::string::String;
+use alloc::vec::Vec;
 use user_lib::console::getchar;
 use user_lib::{exec, fork, waitpid};
+
+struct ProcessArguments {
+    // input 重定向地址
+    input: String,
+    // output 重定向地址
+    output: String,
+    args_copy: Vec<String>,
+    args_addr: Vec<*const u8>,
+}
+
+impl ProcessArguments {
+    pub fn new(command: &str) -> Self {
+        let args: Vec<&str> = command.split(' ').collect();
+        let args_copy: Vec<String> = args
+            .iter()
+            .filter(|arg| !arg.is_empty())
+            .map(|arg| {
+                let mut arg_copy = String::from(*arg);
+                arg_copy.push('\0');
+                arg_copy
+            })
+            .collect();
+        // TODO(justxuewei): 暂时忽略 input/output 重定向问题
+        let mut args_addr: Vec<*const u8> = args_copy.iter().map(|arg| arg.as_ptr()).collect();
+        args_addr.push(core::ptr::null::<u8>());
+        Self {
+            input: String::from(""),
+            output: String::from(""),
+            args_copy,
+            args_addr,
+        }
+    }
+}
 
 #[no_mangle]
 pub fn main() -> i32 {
@@ -27,11 +61,11 @@ pub fn main() -> i32 {
             LF | CR => {
                 println!("");
                 if !line.is_empty() {
-                    line.push('\0');
+                    let cmd = ProcessArguments::new(line.as_str());
                     let pid = fork();
                     if pid == 0 {
                         // child process
-                        if exec(line.as_str()) == -1 {
+                        if exec(&cmd.args_copy[0].as_str(), &cmd.args_addr.as_slice()) == -1 {
                             println!("Error when executing!");
                             return -4;
                         }
