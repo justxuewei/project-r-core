@@ -13,10 +13,10 @@ OS_BIN_OUTPUT := $(TARGET_DIR)/$(RUST_TARGET)/release/os.bin
 FILESYSTEM_IMG := $(USER_DIR)/$(RUST_TARGET)/release/fs.img
 
 build: $(OS_OUTPUT) $(OS_BIN_OUTPUT)
-run: qemu
-brun: clean run
-debug: qemu-gdb
-bdebug: clean debug
+build-user-apps:
+	@cd ../user && make build
+run: build-user-apps build qemu
+debug: build-user-apps build qemu-gdb
 
 # If you want to terminate the QEMU, please
 # press `ctrl + A, X`.
@@ -47,14 +47,18 @@ gdb: $(OS_OUTPUT)
 
 .DEFAULT: default
 
+.PHONY: \
+	clean \
+	build \
+	build-user-apps \
+	$(OS_OUTPUT) \
+	$(OS_BIN_OUTPUT)
+
 $(OS_OUTPUT):
 	@cargo build --release
 
 $(OS_BIN_OUTPUT): $(OS_OUTPUT)
 	@rust-objcopy --strip-all $< -O binary $@
-
-.PHONY: \
-	clean
 
 clean: 
 	@cargo clean

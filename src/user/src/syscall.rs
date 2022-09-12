@@ -1,5 +1,9 @@
 use core::arch::asm;
 
+use crate::OpenFlags;
+
+const SYSCALL_OPEN: usize = 56;
+const SYSCALL_CLOSE: usize = 57;
 const SYSCALL_PIPE: usize = 59;
 const SYSCALL_READ: usize = 63;
 const SYSCALL_WRITE: usize = 64;
@@ -72,4 +76,12 @@ pub fn sys_read(fd: usize, buffer: &mut [u8]) -> isize {
 
 pub fn sys_pipe(pipe: &mut [usize]) -> isize {
     syscall(SYSCALL_PIPE, [pipe.as_mut_ptr() as usize, 0, 0])
+}
+
+pub fn sys_open(path: &str, flags: OpenFlags) -> isize {
+    syscall(SYSCALL_OPEN, [path.as_ptr() as usize, flags.bits() as usize, 0])
+}
+
+pub fn sys_close(fd: usize) -> isize {
+    syscall(SYSCALL_CLOSE, [fd, 0, 0])
 }

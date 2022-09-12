@@ -9,6 +9,7 @@ use alloc::vec::Vec;
 #[macro_use]
 pub mod console;
 mod lang_items;
+use bitflags::*;
 mod syscall;
 
 #[global_allocator]
@@ -63,6 +64,16 @@ const WAITPID_ANY_PID: isize = -1;
 
 pub const WAITPID_NO_CHILDREN_RUNNING: isize = -1;
 pub const WAITPID_CHILDREN_RUNNING: isize = -2;
+
+bitflags! {
+    pub struct OpenFlags: u32 {
+        const READ_ONLY = 0;
+        const WRITE_ONLY = 1 << 0;
+        const READ_WRITE = 1 << 1;
+        const CREATE = 1 << 9;
+        const TRUNCATE = 1 << 10;
+    }
+}
 
 pub fn write(fd: usize, buf: &[u8]) -> isize {
     sys_write(fd, buf)
@@ -131,4 +142,12 @@ pub fn read(fd: usize, buf: &mut [u8]) -> isize {
 
 pub fn pipe(pipe_fd: &mut [usize]) -> isize {
     sys_pipe(pipe_fd)
+}
+
+pub fn open(path: &str, flags: OpenFlags) -> isize {
+    sys_open(path, flags)
+}
+
+pub fn close(fd: usize) -> isize {
+    sys_close(fd)
 }

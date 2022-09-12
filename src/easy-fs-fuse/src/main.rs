@@ -54,8 +54,8 @@ fn easy_fs_pack() -> std::io::Result<()> {
 
     let src_path = matches.value_of("source").unwrap();
     let target_path = matches.value_of("target").unwrap();
-    println!("src_path = {}", src_path);
-    println!("target_path = {}", target_path);
+    // println!("src_path = {}", src_path);
+    // println!("target_path = {}", target_path);
 
     let block_file = Arc::new(BlockFile(Mutex::new({
         let f = OpenOptions::new()
@@ -79,13 +79,13 @@ fn easy_fs_pack() -> std::io::Result<()> {
             name_with_ext
         })
         .collect();
-    println!("apps: {:?}", apps);
+    // println!("apps: {:?}", apps);
     for app in apps {
         // load app data from host file system
-        println!(
-            "app path: {}",
-            Path::new(target_path).join(app.as_str()).to_str().unwrap()
-        );
+        // println!(
+        //     "app path: {}",
+        //     Path::new(target_path).join(app.as_str()).to_str().unwrap()
+        // );
         let mut host_file =
             File::open(Path::new(target_path).join(app.as_str()).to_str().unwrap()).unwrap();
         let mut all_data: Vec<u8> = Vec::new();

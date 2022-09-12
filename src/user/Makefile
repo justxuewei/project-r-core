@@ -15,12 +15,12 @@ elf: $(APPS)
 	@cargo build --release
 
 binary: elf
-	$(foreach elf, $(ELFS), $(OBJCOPY) $(elf) --strip-all -O binary $(patsubst $(TARGET_DIR)/%, $(TARGET_DIR)/%.bin, $(elf));)
+	@$(foreach elf, $(ELFS), $(OBJCOPY) $(elf) --strip-all -O binary $(patsubst $(TARGET_DIR)/%, $(TARGET_DIR)/%.bin, $(elf));)
 
 build: binary
 ifeq (, $(wildcard $(EASY_FS_FUSE_TARGET)/easy-fs-fuse))
 	@echo "easy-fs-fuse not found"
-	@exit 1
+	@cd ../easy-fs-fuse && make
 endif
 	@$(EASY_FS_FUSE_TARGET)/easy-fs-fuse -s $(APP_DIR) -t $(TARGET_DIR)
 
