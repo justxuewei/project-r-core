@@ -151,3 +151,7 @@ pub fn open(path: &str, flags: OpenFlags) -> isize {
 pub fn close(fd: usize) -> isize {
     sys_close(fd)
 }
+
+pub fn dup(fd: usize) -> isize {
+    sys_dup(fd)
+}

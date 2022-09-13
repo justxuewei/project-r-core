@@ -2,7 +2,7 @@
 #![no_main]
 
 use alloc::string::String;
-use user_lib::{open, OpenFlags, read, close};
+use user_lib::{close, open, read, OpenFlags};
 
 #[macro_use]
 extern crate user_lib;

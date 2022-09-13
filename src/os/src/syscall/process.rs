@@ -66,6 +66,8 @@ pub fn sys_exec(path: *const u8, mut args: *const usize) -> isize {
             .unwrap()
             .exec(data.as_slice(), args_vec);
         return argc as isize;
+    } else {
+        println!("[kernel] Syscall exec error due to opening \"{}\"", app_name);
     }
     -1
 }

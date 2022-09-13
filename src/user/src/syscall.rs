@@ -2,6 +2,7 @@ use core::arch::asm;
 
 use crate::OpenFlags;
 
+const SYSCALL_DUP: usize = 24;
 const SYSCALL_OPEN: usize = 56;
 const SYSCALL_CLOSE: usize = 57;
 const SYSCALL_PIPE: usize = 59;
@@ -79,9 +80,16 @@ pub fn sys_pipe(pipe: &mut [usize]) -> isize {
 }
 
 pub fn sys_open(path: &str, flags: OpenFlags) -> isize {
-    syscall(SYSCALL_OPEN, [path.as_ptr() as usize, flags.bits() as usize, 0])
+    syscall(
+        SYSCALL_OPEN,
+        [path.as_ptr() as usize, flags.bits() as usize, 0],
+    )
 }
 
 pub fn sys_close(fd: usize) -> isize {
     syscall(SYSCALL_CLOSE, [fd, 0, 0])
+}
+
+pub fn sys_dup(fd: usize) -> isize {
+    syscall(SYSCALL_DUP, [fd, 0, 0])
 }

@@ -94,3 +94,18 @@ pub fn sys_pipe(pipe: *mut usize) -> isize {
     *translated_ref_mut(token, unsafe { pipe.add(1) }) = write_fd;
     0
 }
+
+/// sys_dup 复制指定 fd 并将其插入到 fd_table 中
+pub fn sys_dup(fd: usize) -> isize {
+    let task = current_task().unwrap();
+    let mut task_inner = task.inner_exclusive_access();
+    if fd >= task_inner.fd_table.len() {
+        return -1;
+    }
+    if task_inner.fd_table[fd].is_none() {
+        return -1;
+    }
+    let new_fd = task_inner.alloc_fd();
+    task_inner.fd_table[new_fd] = task_inner.fd_table[fd].clone();
+    new_fd as isize
+}
