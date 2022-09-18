@@ -8,7 +8,7 @@ use alloc::{
 
 use super::{
     pid::{self, KernelStack, PidHandle},
-    TaskContext,
+    SignalActions, SignalFlags, TaskContext,
 };
 
 use crate::{
@@ -46,6 +46,15 @@ pub struct TaskControlBlockInner {
     pub exit_code: i32,
 
     pub fd_table: Vec<Option<Arc<dyn File + Send + Sync>>>,
+
+    // ===== signal-related =====
+    pub signals: SignalFlags,
+    pub signal_mask: SignalFlags,
+    pub handling_sig: isize,
+    pub signal_actions: SignalActions,
+    pub killed: bool,
+    pub frozen: bool,
+    pub trap_ctx_backup: Option<TrapContext>,
 }
 
 impl TaskControlBlockInner {
@@ -106,6 +115,13 @@ impl TaskControlBlock {
                     // 2 -> stderr
                     Some(Arc::new(Stdout)),
                 ],
+                signals: SignalFlags::empty(),
+                signal_mask: SignalFlags::empty(),
+                handling_sig: -1,
+                signal_actions: SignalActions::default(),
+                killed: false,
+                frozen: false,
+                trap_ctx_backup: None,
             })
         };
 
@@ -164,6 +180,15 @@ impl TaskControlBlock {
             children: Vec::new(),
             exit_code: 0,
             fd_table: new_fd_table,
+            signals: SignalFlags::empty(),
+            // 继承 parent 的信号掩码
+            signal_mask: parent_inner.signal_mask,
+            handling_sig: -1,
+            // 继承 parent 的 signal actions
+            signal_actions: parent_inner.signal_actions.clone(),
+            killed: false,
+            frozen: false,
+            trap_ctx_backup: None,
         };
 
         let tcb = Arc::new(TaskControlBlock {

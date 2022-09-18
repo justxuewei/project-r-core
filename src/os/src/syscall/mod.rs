@@ -6,6 +6,10 @@ const SYSCALL_READ: usize = 63;
 const SYSCALL_WRITE: usize = 64;
 const SYSCALL_EXIT: usize = 93;
 const SYSCALL_YIELD: usize = 124;
+const SYSCALL_KILL: usize = 129;
+const SYSCALL_SIGACTION: usize = 134;
+const SYSCALL_SIGPROCMASK: usize = 135;
+const SYSCALL_SIGRETURN: usize = 139;
 const SYSCALL_GET_TIME: usize = 169;
 const SYSCALL_GETPID: usize = 172;
 const SYSCALL_FORK: usize = 220;
@@ -17,6 +21,8 @@ mod process;
 
 use fs::*;
 use process::*;
+
+use crate::task::SignalAction;
 
 pub fn syscall(syscall_id: usize, args: [usize; 3]) -> isize {
     match syscall_id {
@@ -33,6 +39,14 @@ pub fn syscall(syscall_id: usize, args: [usize; 3]) -> isize {
         SYSCALL_CLOSE => sys_close(args[0]),
         SYSCALL_PIPE => sys_pipe(args[0] as *mut usize),
         SYSCALL_DUP => sys_dup(args[0]),
+        SYSCALL_KILL => sys_kill(args[0], args[1] as i32),
+        SYSCALL_SIGACTION => sys_sigaction(
+            args[0] as i32,
+            args[1] as *const SignalAction,
+            args[2] as *mut SignalAction,
+        ),
+        SYSCALL_SIGRETURN => sys_sigreturn(),
+        SYSCALL_SIGPROCMASK => sys_procmask(args[0] as u32),
         _ => panic!("Unsupported system_id: {}", syscall_id),
     }
 }

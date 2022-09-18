@@ -1,7 +1,9 @@
+mod action;
 mod context;
 pub mod manager;
 mod pid;
 pub mod processor;
+mod signal;
 mod switch;
 mod task;
 
@@ -13,9 +15,11 @@ use crate::{
     task::task::TaskControlBlock,
 };
 
+pub use action::{SignalAction, SignalActions};
+pub use signal::{handle_signals, SignalFlags, MAX_SIG};
 pub use {context::TaskContext, processor::run_tasks};
 
-use self::task::TaskStatus;
+use self::{manager::remove_from_pid_to_task, processor::current_task, task::TaskStatus};
 
 const INITPROC_NAME: &str = "initproc";
 
@@ -57,6 +61,8 @@ pub fn exit_current_and_run_next(exit_code: i32) {
     current_task_inner.children.clear();
     current_task_inner.memory_set.release_areas();
 
+    remove_from_pid_to_task(current_task.getpid());
+
     drop(initproc_inner);
     drop(current_task_inner);
     drop(current_task);
@@ -68,4 +74,18 @@ pub fn exit_current_and_run_next(exit_code: i32) {
     // 同时也要注意的是堆资源是必须手动清理的，比如上面的 `initproc_inner`。
     let mut _unused = TaskContext::zero_init();
     processor::schedule((&mut _unused) as *mut TaskContext)
+}
+
+/// 给当前进程添加一个信号
+pub fn current_add_signal(flag: SignalFlags) {
+    let task = current_task().unwrap();
+    let mut task_inner = task.inner_exclusive_access();
+    task_inner.signals.insert(flag);
+}
+
+/// 返回特殊信号的 ID 和错误信息
+pub fn check_signals_error_of_current() -> Option<(i32, &'static str)> {
+    let task = current_task().unwrap();
+    let task_inner = task.inner_exclusive_access();
+    task_inner.signals.check_error()
 }
