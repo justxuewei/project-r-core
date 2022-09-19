@@ -3,25 +3,38 @@
 #![feature(panic_info_message)]
 #![feature(alloc_error_handler)]
 
+// ===== extern crate section =====
 extern crate alloc;
-use alloc::vec::Vec;
 
+// ===== mod section =====
 #[macro_use]
 pub mod console;
 mod lang_items;
 use bitflags::*;
 mod syscall;
+pub mod syscall_signal;
 
+// ===== use section =====
+use alloc::vec::Vec;
+use buddy_system_allocator::LockedHeap;
+use syscall::*;
+pub use syscall_signal::*;
+
+// ===== static section =====
 #[global_allocator]
 static HEAP: LockedHeap = LockedHeap::empty();
+static mut HEAP_SPACE: [u8; USER_HEAP_SIZE] = [0; USER_HEAP_SIZE];
+
+// ===== const section =====
+const USER_HEAP_SIZE: usize = 16384;
+const WAITPID_ANY_PID: isize = -1;
+pub const WAITPID_NO_CHILDREN_RUNNING: isize = -1;
+pub const WAITPID_CHILDREN_RUNNING: isize = -2;
 
 #[alloc_error_handler]
 pub fn handle_alloc_error(layout: core::alloc::Layout) -> ! {
     panic!("Heap allocation error, layout = {:?}", layout);
 }
-
-const USER_HEAP_SIZE: usize = 16384;
-static mut HEAP_SPACE: [u8; USER_HEAP_SIZE] = [0; USER_HEAP_SIZE];
 
 // 进程在首次打开的时候会执行 _start 方法，在该方法中进一步执行了函数的主入口
 // （main），同时还兼具从 user_sp 中获取 argc 和 argv 的功能。
@@ -56,14 +69,6 @@ pub extern "C" fn _start(argc: usize, argv_base: usize) -> ! {
 fn main(_argc: usize, _argv: &[&str]) -> i32 {
     panic!("Cannot find main!");
 }
-
-use buddy_system_allocator::LockedHeap;
-use syscall::*;
-
-const WAITPID_ANY_PID: isize = -1;
-
-pub const WAITPID_NO_CHILDREN_RUNNING: isize = -1;
-pub const WAITPID_CHILDREN_RUNNING: isize = -2;
 
 bitflags! {
     pub struct OpenFlags: u32 {
@@ -154,4 +159,24 @@ pub fn close(fd: usize) -> isize {
 
 pub fn dup(fd: usize) -> isize {
     sys_dup(fd)
+}
+
+pub fn kill(pid: usize, signal: i32) -> isize {
+    sys_kill(pid, signal)
+}
+
+pub fn sigaction(
+    signum: i32,
+    action: *const SignalAction,
+    old_action: *const SignalAction,
+) -> isize {
+    sys_sigaction(signum, action, old_action)
+}
+
+pub fn sigprocmask(mask: u32) -> isize {
+    sys_sigprocmask(mask)
+}
+
+pub fn sigreturn() -> isize {
+    sys_sigreturn()
 }

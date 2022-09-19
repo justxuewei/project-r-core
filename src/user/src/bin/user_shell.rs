@@ -126,7 +126,10 @@ pub fn main() -> i32 {
                                 if !cmd.input.is_empty() {
                                     let fd = open(cmd.input.as_str(), OpenFlags::READ_ONLY);
                                     if fd == -1 {
-                                        println!("[user_shell] Error when opening file {}", cmd.input);
+                                        println!(
+                                            "[user_shell] Error when opening file {}",
+                                            cmd.input
+                                        );
                                         return -4;
                                     }
                                     let fd = fd as usize;
@@ -141,7 +144,10 @@ pub fn main() -> i32 {
                                         OpenFlags::CREATE | OpenFlags::WRITE_ONLY,
                                     );
                                     if fd == -1 {
-                                        println!("[user_shell] Error when opening file {}", cmd.output);
+                                        println!(
+                                            "[user_shell] Error when opening file {}",
+                                            cmd.output
+                                        );
                                         return -4;
                                     }
                                     let fd = fd as usize;
@@ -168,7 +174,10 @@ pub fn main() -> i32 {
                                 }
                                 // exec new process
                                 if exec(cmd.args_copy[0].as_str(), cmd.args_addr.as_slice()) == -1 {
-                                    println!("[user_shell] Error when executing {}", cmd.args_copy[0]);
+                                    println!(
+                                        "[user_shell] Error when executing {}",
+                                        cmd.args_copy[0]
+                                    );
                                     return -4;
                                 }
                                 unreachable!()
