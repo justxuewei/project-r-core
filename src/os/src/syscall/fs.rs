@@ -1,6 +1,6 @@
 use crate::{
-    fs::{inode::OpenFlags, open_file},
-    mm::page_table::{translated_byte_buffer, translated_str, UserBuffer},
+    fs::{inode::OpenFlags, open_file, pipe},
+    mm::page_table::{translated_byte_buffer, translated_ref_mut, translated_str, UserBuffer},
     task::processor::{current_task, current_user_token},
 };
 
@@ -75,4 +75,37 @@ pub fn sys_close(fd: usize) -> isize {
     }
     task_inner.fd_table[fd].take();
     0
+}
+
+/// sys_pipe 将会为进程注册两个 fd，一个用于读，一个用于写，这两个 fd 被保存到
+/// pipe_fd。
+pub fn sys_pipe(pipe: *mut usize) -> isize {
+    let task = current_task().unwrap();
+    let mut task_inner = task.inner_exclusive_access();
+    let token = current_user_token();
+    // 创建 pipes 并保存到进程的 fd_table 中
+    let (read_p, write_p) = pipe::make_pipe();
+    let read_fd = task_inner.alloc_fd();
+    task_inner.fd_table[read_fd] = Some(read_p);
+    let write_fd = task_inner.alloc_fd();
+    task_inner.fd_table[write_fd] = Some(write_p);
+    // 将 read_fd 和 write_fd 传递给用户
+    *translated_ref_mut(token, pipe) = read_fd;
+    *translated_ref_mut(token, unsafe { pipe.add(1) }) = write_fd;
+    0
+}
+
+/// sys_dup 复制指定 fd 并将其插入到 fd_table 中
+pub fn sys_dup(fd: usize) -> isize {
+    let task = current_task().unwrap();
+    let mut task_inner = task.inner_exclusive_access();
+    if fd >= task_inner.fd_table.len() {
+        return -1;
+    }
+    if task_inner.fd_table[fd].is_none() {
+        return -1;
+    }
+    let new_fd = task_inner.alloc_fd();
+    task_inner.fd_table[new_fd] = task_inner.fd_table[fd].clone();
+    new_fd as isize
 }

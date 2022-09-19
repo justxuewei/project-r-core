@@ -1,6 +1,7 @@
 use crate::mm::UserBuffer;
 
 pub mod inode;
+pub mod pipe;
 pub mod stdio;
 
 pub use inode::open_file;

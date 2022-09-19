@@ -1,9 +1,14 @@
-use alloc::sync::Arc;
+use alloc::{string::String, sync::Arc, vec::Vec};
 
 use crate::{
     fs::{inode::OpenFlags, open_file},
-    mm::page_table,
-    task::{self, manager, processor},
+    mm::page_table::{self, translated_ref, translated_ref_mut},
+    task::{
+        self,
+        manager::{self, get_task_by_pid},
+        processor::{self, current_task, current_user_token},
+        SignalAction, SignalFlags, MAX_SIG,
+    },
     timer,
 };
 
@@ -43,13 +48,34 @@ pub fn sys_fork() -> isize {
     child_pid as isize
 }
 
-pub fn sys_exec(path: *const u8) -> isize {
+/// exec syscall，
+/// path 表示用户程序的地址（目前只能是名字），
+/// args 表示用户程序的参数，类型是 [&str]，数据为 0 表明没有更多的参数了
+pub fn sys_exec(path: *const u8, mut args: *const usize) -> isize {
     let token = processor::current_user_token();
     let app_name = page_table::translated_str(token, path);
+    // args
+    let mut args_vec: Vec<String> = Vec::new();
+    loop {
+        let arg_str_ptr = *page_table::translated_ref(token, args);
+        if arg_str_ptr == 0 {
+            break;
+        }
+        args_vec.push(page_table::translated_str(token, arg_str_ptr as *const u8));
+        unsafe { args = args.add(1) }
+    }
     if let Some(inode) = open_file(app_name.as_str(), OpenFlags::READ_ONLY) {
         let data = inode.read_all();
-        processor::current_task().unwrap().exec(data.as_slice());
-        return 0;
+        let argc = args_vec.len();
+        processor::current_task()
+            .unwrap()
+            .exec(data.as_slice(), args_vec);
+        return argc as isize;
+    } else {
+        println!(
+            "[kernel] Syscall exec error due to opening \"{}\"",
+            app_name
+        );
     }
     -1
 }
@@ -91,4 +117,83 @@ pub fn sys_waitpid(pid: isize, exit_code_ptr: *mut i32) -> isize {
     }
 
     CHILDREN_RUNNING
+}
+
+// 注册一个新的 signal action，返回原有的 signal action。
+pub fn sys_sigaction(
+    signum: i32,
+    action: *const SignalAction,
+    old_action: *mut SignalAction,
+) -> isize {
+    let token = current_user_token();
+    if current_task().is_none() {
+        return -1;
+    }
+    let task = current_task().unwrap();
+    let mut task_inner = task.inner_exclusive_access();
+    if signum as usize > MAX_SIG {
+        return -1;
+    }
+    let flag = SignalFlags::from_bits(1 << signum);
+    if flag.is_none() {
+        return -1;
+    }
+    let flag = flag.unwrap();
+    if action as usize == 0
+        || old_action as usize == 0
+        || flag == SignalFlags::SIGKILL
+        || flag == SignalFlags::SIGSTOP
+    {
+        return -1;
+    }
+    let old_action_from_kernel = task_inner.signal_actions.table[signum as usize];
+    *translated_ref_mut(token, old_action) = old_action_from_kernel;
+    task_inner.signal_actions.table[signum as usize] = *translated_ref(token, action);
+    0
+}
+
+/// 发送信号
+// QUESTION(justxuewei): 为什么发送信号要叫 `sys_kill` 呢？
+pub fn sys_kill(pid: usize, signum: i32) -> isize {
+    let task = get_task_by_pid(pid);
+    if task.is_none() {
+        return -1;
+    }
+    let flag = SignalFlags::from_bits(1 << signum);
+    if flag.is_none() {
+        return -1;
+    }
+    let task = task.unwrap();
+    let flag = flag.unwrap();
+    let mut task_inner = task.inner_exclusive_access();
+    if task_inner.signals.contains(flag) {
+        return -1;
+    }
+    task_inner.signals.insert(flag);
+    0
+}
+
+/// 信号处理结束，返回执行用户逻辑
+pub fn sys_sigreturn() -> isize {
+    if let Some(task) = current_task() {
+        let mut task_inner = task.inner_exclusive_access();
+        task_inner.handling_sig = -1;
+        let trap_ctx = task_inner.get_trap_cx();
+        *trap_ctx = task_inner.trap_ctx_backup.unwrap();
+        return 0;
+    }
+    -1
+}
+
+/// 设置进程的信号掩码
+pub fn sys_procmask(mask: u32) -> isize {
+    if let Some(task) = current_task() {
+        let mut task_inner = task.inner_exclusive_access();
+        let old_mask = task_inner.signal_mask;
+        if let Some(flag) = SignalFlags::from_bits(mask) {
+            task_inner.signal_mask = flag;
+            return old_mask.bits() as isize;
+        }
+    }
+    -1
 }

@@ -1,13 +1,14 @@
 use core::cell::RefMut;
 
 use alloc::{
+    string::String,
     sync::{Arc, Weak},
     vec::Vec,
 };
 
 use super::{
     pid::{self, KernelStack, PidHandle},
-    TaskContext,
+    SignalActions, SignalFlags, TaskContext,
 };
 
 use crate::{
@@ -17,6 +18,7 @@ use crate::{
         self,
         address::{PhysPageNum, VirtAddr},
         memory_set::MemorySet,
+        page_table::translated_ref_mut,
         KERNEL_SPACE,
     },
     sync::UPSafeCell,
@@ -44,6 +46,15 @@ pub struct TaskControlBlockInner {
     pub exit_code: i32,
 
     pub fd_table: Vec<Option<Arc<dyn File + Send + Sync>>>,
+
+    // ===== signal-related =====
+    pub signals: SignalFlags,
+    pub signal_mask: SignalFlags,
+    pub handling_sig: isize,
+    pub signal_actions: SignalActions,
+    pub killed: bool,
+    pub frozen: bool,
+    pub trap_ctx_backup: Option<TrapContext>,
 }
 
 impl TaskControlBlockInner {
@@ -104,6 +115,13 @@ impl TaskControlBlock {
                     // 2 -> stderr
                     Some(Arc::new(Stdout)),
                 ],
+                signals: SignalFlags::empty(),
+                signal_mask: SignalFlags::empty(),
+                handling_sig: -1,
+                signal_actions: SignalActions::default(),
+                killed: false,
+                frozen: false,
+                trap_ctx_backup: None,
             })
         };
 
@@ -162,6 +180,15 @@ impl TaskControlBlock {
             children: Vec::new(),
             exit_code: 0,
             fd_table: new_fd_table,
+            signals: SignalFlags::empty(),
+            // 继承 parent 的信号掩码
+            signal_mask: parent_inner.signal_mask,
+            handling_sig: -1,
+            // 继承 parent 的 signal actions
+            signal_actions: parent_inner.signal_actions.clone(),
+            killed: false,
+            frozen: false,
+            trap_ctx_backup: None,
         };
 
         let tcb = Arc::new(TaskControlBlock {
@@ -178,24 +205,58 @@ impl TaskControlBlock {
         tcb
     }
 
-    pub fn exec(&self, elf_data: &[u8]) {
-        let (mmset, user_sp, entrypoint) = MemorySet::from_elf(elf_data);
+    pub fn exec(&self, elf_data: &[u8], args: Vec<String>) {
+        let (mmset, mut user_sp, entrypoint) = MemorySet::from_elf(elf_data);
 
         let trap_cx_ppn = mmset
             .translate(VirtAddr::from(config::TRAP_CONTEXT).into())
             .unwrap()
             .ppn();
+
+        // push args on user sp
+        user_sp -= (args.len() + 1) * core::mem::size_of::<usize>();
+        let argv_base = user_sp;
+        // user_sp layout for `{app_name}` ab cd
+        // <High Addr> | \0 | *argv[1] | *argv[0] | \0 | 'b' | 'a'(**argv[0]) | \0 | 'd' | 'c'(**argv[1]) | <Low Addr>
+        // 这一小段处理的是 <High Addr> | \0 | *argv[1] | *argv[0] | <Low Addr>
+        // argv[i] 指向的是第 i 个参数的首地址，以 *argv[0] 指向的地址就是 'b' 字符的地址
+        let mut argv: Vec<_> = (0..=args.len())
+            .map(|arg| {
+                translated_ref_mut(
+                    mmset.token(),
+                    (argv_base + arg * core::mem::size_of::<usize>()) as *mut usize,
+                )
+            })
+            .collect();
+        *argv[args.len()] = 0;
+        // 复制 args 到 user_sp
+        // 这一小段处理的是 <High Addr> | \0 | 'b' | 'a'(**argv[0]) | \0 | 'd' | 'c'(**argv[1]) | <Low Addr>
+        for i in 0..args.len() {
+            user_sp -= args[i].len() + 1;
+            *argv[i] = user_sp;
+            let mut p = user_sp;
+            for c in args[i].as_bytes() {
+                *translated_ref_mut(mmset.token(), p as *mut u8) = *c;
+                p += 1;
+            }
+            *translated_ref_mut(mmset.token(), p as *mut u8) = 0;
+        }
+        // 内存对齐（符合 k210 平台要求的）
+        user_sp -= user_sp % core::mem::size_of::<usize>();
+
         let mut tcb_inner = self.inner_exclusive_access();
         tcb_inner.memory_set = mmset;
         tcb_inner.trap_cx_ppn = trap_cx_ppn;
-        let trap_cx = tcb_inner.get_trap_cx();
-        *trap_cx = TrapContext::app_init_context(
+        let mut trap_cx = TrapContext::app_init_context(
             entrypoint,
             user_sp,
             KERNEL_SPACE.exclusive_access().token(),
             self.kernel_stack.get_top(),
             trap::trap_handler as usize,
         );
+        trap_cx.x[10] = args.len();
+        trap_cx.x[11] = argv_base;
+        *tcb_inner.get_trap_cx() = trap_cx;
     }
 }
 

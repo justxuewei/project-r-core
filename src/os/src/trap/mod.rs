@@ -3,7 +3,10 @@ mod context;
 use crate::{
     config,
     syscall::syscall,
-    task::{self, processor},
+    task::{
+        self, check_signals_error_of_current, exit_current_and_run_next, handle_signals, processor,
+        SignalFlags,
+    },
     timer,
 };
 use core::arch::{asm, global_asm};
@@ -16,9 +19,6 @@ use riscv::register::{
 pub use context::TrapContext;
 
 global_asm!(include_str!("trap.S"));
-
-const MEM_FAULT: i32 = -2;
-const ILLEGAL_INSTRUCTION_FAULT: i32 = -3;
 
 pub fn init() {
     set_kernel_trap_entry();
@@ -66,11 +66,11 @@ pub fn trap_handler() -> ! {
         | Trap::Exception(Exception::LoadFault)
         | Trap::Exception(Exception::LoadPageFault) => {
             println!("[kernel] PageFault in application, kernel killed it.");
-            task::exit_current_and_run_next(MEM_FAULT);
+            task::current_add_signal(SignalFlags::SIGSEGV);
         }
         Trap::Exception(Exception::IllegalInstruction) => {
             println!("[kernel] IllegalInstruction in application, kernel killed it.");
-            task::exit_current_and_run_next(ILLEGAL_INSTRUCTION_FAULT);
+            task::current_add_signal(SignalFlags::SIGILL);
         }
         Trap::Interrupt(Interrupt::SupervisorTimer) => {
             timer::set_next_trigger();
@@ -83,6 +83,12 @@ pub fn trap_handler() -> ! {
                 stval
             );
         }
+    }
+
+    handle_signals();
+    if let Some((sig, msg)) = check_signals_error_of_current() {
+        println!("[kernel] Error from signal: {}, sig = {}", msg, sig);
+        exit_current_and_run_next(sig);
     }
 
     trap_return();

@@ -48,8 +48,20 @@ impl PhysAddr {
         self.page_offset() == 0
     }
 
+    /// 以 unsafe 的方式获取地址指针的可变引用，
+    /// usize -> *mut T -> &'a mut T，
+    /// rCore 教程在为什么给 'static 中做了说明：
+    /// http://rcore-os.cn/rCore-Tutorial-Book-v3/chapter4/4sv39-implementation-2.html#id7，
+    /// 主要是为了绕过 rust 生命周期检查的，所以在非常极端的情况还是会出现指针错
+    /// 误。
     pub fn get_mut<T>(&self) -> &'static mut T {
         unsafe { (self.0 as *mut T).as_mut().unwrap() }
+    }
+
+    /// 以 unsafe 的方式获取地址指针的引用，
+    /// usize -> *const T -> &'a T
+    pub fn get_ref<T>(&self) -> &'static T {
+        unsafe { (self.0 as *const T).as_ref().unwrap() }
     }
 }
 
