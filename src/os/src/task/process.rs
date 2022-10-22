@@ -83,6 +83,7 @@ impl ProcessControlBlock {
     // new 读取用户 elf 程序，创建用户空间同时初始化 kernel stack
     pub fn new(elf_data: &[u8]) -> Arc<Self> {
         let (memory_set, ustack_base, entrypoint) = MemorySet::from_elf(elf_data);
+        let token = memory_set.token();
 
         let pid_handle = pid_alloc();
         let process_inner = unsafe {
@@ -118,17 +119,19 @@ impl ProcessControlBlock {
         *task_inner.get_trap_cx() = TrapContext::app_init_context(
             entrypoint,
             task_inner.res.as_ref().unwrap().ustack_top(),
-            memory_set.token(),
+            token,
             task.kstack.get_top(),
             trap_handler as usize,
         );
+        drop(task_inner);
         // 将 task 加入 process
-        let process_inner = process.inner_exclusive_access();
-        process_inner.tasks.push(Some(task));
+        let mut process_inner = process.inner_exclusive_access();
+        process_inner.tasks.push(Some(task.clone()));
         // 增加 pid to process 的映射关系
         insert_into_pid_to_pcb(process.getpid(), process.clone());
         // 将 task 加入调度队列
         add_task(task);
+        drop(process_inner);
 
         process
     }
@@ -139,7 +142,7 @@ impl ProcessControlBlock {
 
     /// 复制进程，目前只支持复制单个 task 的进程
     pub fn fork(self: &Arc<ProcessControlBlock>) -> Arc<ProcessControlBlock> {
-        let parent_inner = self.inner_exclusive_access();
+        let mut parent_inner = self.inner_exclusive_access();
         if parent_inner.tasks.len() > 1 {
             panic!("too much tasks to fork");
         }
@@ -187,7 +190,9 @@ impl ProcessControlBlock {
                 .ustack_base,
             false,
         ));
+        let mut child_inner = child.inner_exclusive_access();
         child_inner.tasks.push(Some(task.clone()));
+        drop(child_inner);
         // 修改 TrapContext
         // 这里不能直接继承父进程的主线程的 kstack 吗？
         // 不可以！因为在内核态统一使用的是**操作系统的内存地址空间**（与之对比
@@ -195,8 +200,9 @@ impl ProcessControlBlock {
         let task_inner = task.inner_exclusive_access();
         let trap_cx = task_inner.get_trap_cx();
         trap_cx.kernel_sp = task.kstack.get_top();
+        drop(task_inner);
         // 增加 pid to process 的映射关系
-        insert_into_pid_to_pcb(child.getpid(), child);
+        insert_into_pid_to_pcb(child.getpid(), child.clone());
         // 将 task 加入调度队列
         add_task(task);
 
@@ -212,13 +218,14 @@ impl ProcessControlBlock {
         self.inner_exclusive_access().memory_set = mmset;
 
         let task = process_inner.get_task(0);
-        let task_inner = task.inner_exclusive_access();
+        let mut task_inner = task.inner_exclusive_access();
         let res = task_inner.res.as_mut().unwrap();
         res.ustack_base = ustack_base;
         res.alloc_user_res();
-        task_inner.trap_cx_ppn = res.trap_cx_ppn();
+        drop(res);
+        task_inner.trap_cx_ppn = task_inner.res.as_mut().unwrap().trap_cx_ppn();
 
-        let mut user_sp = res.ustack_top();
+        let mut user_sp = task_inner.res.as_mut().unwrap().ustack_top();
         // push args on user sp
         user_sp -= (args.len() + 1) * core::mem::size_of::<usize>();
         let argv_base = user_sp;
@@ -229,7 +236,7 @@ impl ProcessControlBlock {
         let mut argv: Vec<_> = (0..=args.len())
             .map(|arg| {
                 translated_ref_mut(
-                    mmset.token(),
+                    token,
                     (argv_base + arg * core::mem::size_of::<usize>()) as *mut usize,
                 )
             })
@@ -242,10 +249,10 @@ impl ProcessControlBlock {
             *argv[i] = user_sp;
             let mut p = user_sp;
             for c in args[i].as_bytes() {
-                *translated_ref_mut(mmset.token(), p as *mut u8) = *c;
+                *translated_ref_mut(token, p as *mut u8) = *c;
                 p += 1;
             }
-            *translated_ref_mut(mmset.token(), p as *mut u8) = 0;
+            *translated_ref_mut(token, p as *mut u8) = 0;
         }
         // 内存对齐（符合 k210 平台要求的）
         user_sp -= user_sp % core::mem::size_of::<usize>();

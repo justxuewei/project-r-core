@@ -67,7 +67,8 @@ pub fn current_user_token() -> usize {
 
 pub fn current_trap_cx() -> &'static mut TrapContext {
     let task = current_task().unwrap();
-    task.inner_exclusive_access().get_trap_cx()
+    let task_inner = task.inner_exclusive_access();
+    task_inner.get_trap_cx()
 }
 
 // 无限循环直至有一个 task 到来，此时使用 __switch 切换进程

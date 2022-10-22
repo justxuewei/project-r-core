@@ -88,7 +88,8 @@ impl TaskUserRes {
     }
 
     fn dealloc_user_res(&self) {
-        let inner = self.process.upgrade().unwrap().inner_exclusive_access();
+        let process = self.process.upgrade().unwrap();
+        let mut inner = process.inner_exclusive_access();
         // dealloc ustack
         inner
             .memory_set

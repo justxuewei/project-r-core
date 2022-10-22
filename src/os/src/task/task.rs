@@ -52,7 +52,8 @@ impl TaskControlBlock {
 
     pub fn get_user_token(&self) -> usize {
         let process = self.process.upgrade().unwrap();
-        process.inner_exclusive_access().memory_set.token()
+        let process_inner = process.inner_exclusive_access();
+        process_inner.memory_set.token()
     }
 }
 

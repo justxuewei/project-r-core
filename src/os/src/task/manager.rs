@@ -80,7 +80,7 @@ pub fn remove_from_pid_to_pcb(pid: usize) {
 
 /// 新增 pid 和 pcb 的映射关系，aka "insert_into_pid2process"
 pub fn insert_into_pid_to_pcb(pid: usize, pcb: Arc<ProcessControlBlock>) {
-    let map = PID_TO_PCB.exclusive_access();
+    let mut map = PID_TO_PCB.exclusive_access();
     if map.get(&pid).is_some() {
         panic!("pid existed");
     }

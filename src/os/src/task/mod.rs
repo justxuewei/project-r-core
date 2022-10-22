@@ -1,4 +1,3 @@
-mod action;
 mod context;
 mod id;
 pub mod manager;
@@ -16,7 +15,6 @@ use crate::{
     task::process::ProcessControlBlock,
 };
 
-pub use action::{SignalAction, SignalActions};
 pub use signal::{SignalFlags, MAX_SIG};
 pub use task::TaskControlBlock;
 pub use {context::TaskContext, processor::run_tasks};
@@ -57,7 +55,7 @@ pub fn suspend_current_and_run_next() {
 /// 退出当前进程并运行下一个进程
 pub fn exit_current_and_run_next(exit_code: i32) {
     let task = current_task().unwrap();
-    let task_inner = task.inner_exclusive_access();
+    let mut task_inner = task.inner_exclusive_access();
     let process = task.process.upgrade().unwrap();
     let tid = task_inner.res.as_ref().unwrap().tid;
 
@@ -70,7 +68,7 @@ pub fn exit_current_and_run_next(exit_code: i32) {
 
     // 如果主线程（tid == 0）被终止，那么进程也需要被终止
     if tid == 0 {
-        let process_inner = process.inner_exclusive_access();
+        let mut process_inner = process.inner_exclusive_access();
         process_inner.is_zombie = true;
         process_inner.exit_code = exit_code;
 
@@ -85,7 +83,7 @@ pub fn exit_current_and_run_next(exit_code: i32) {
         // 释放当前进程的全部线程的资源（比如 ustack 等）
         for task in process_inner.tasks.iter().filter(|t| t.is_some()) {
             let task = task.as_deref().unwrap();
-            let task_inner = task.inner_exclusive_access();
+            let mut task_inner = task.inner_exclusive_access();
             task_inner.res = None;
         }
 
@@ -103,7 +101,7 @@ pub fn exit_current_and_run_next(exit_code: i32) {
 /// 给当前进程添加一个信号
 pub fn current_add_signal(flag: SignalFlags) {
     let process = current_process();
-    let process_inner = process.inner_exclusive_access();
+    let mut process_inner = process.inner_exclusive_access();
     process_inner.signals.insert(flag);
 }
 

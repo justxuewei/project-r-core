@@ -290,6 +290,15 @@ impl MemorySet {
     // from_elf 根据 elf 文件创建一个 mmset，
     // 完成的事情包括验证 elf 文件是否合法，根据 program headers 加载数据的逻辑段，
     // 设置 user stack，以及设置 trap context 地址。
+    //
+    //     low addr
+    //   ┌───────────┐ ◀────── (bottom)
+    //   │           │
+    //   │ UserStack │
+    //   │           │
+    //   └───────────┘ ◀────── ustack_base (top)
+    //     high addr
+    //
     // returns:
     //  - memory_set
     //  - user stack 栈顶虚拟地址
@@ -399,7 +408,8 @@ impl MemorySet {
         self.page_table.translate(vpn)
     }
 
-    pub fn release_areas(&mut self) {
+    /// 移除全部的内存，比如代码区、bss 区等
+    pub fn recycle_data_pages(&mut self) {
         self.areas.clear()
     }
 }
