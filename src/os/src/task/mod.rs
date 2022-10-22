@@ -1,7 +1,8 @@
 mod action;
 mod context;
+mod id;
 pub mod manager;
-mod pid;
+mod process;
 pub mod processor;
 mod signal;
 mod switch;
@@ -12,80 +13,103 @@ use lazy_static::*;
 
 use crate::{
     fs::{inode::OpenFlags, open_file},
-    task::task::TaskControlBlock,
+    task::process::ProcessControlBlock,
 };
 
 pub use action::{SignalAction, SignalActions};
-pub use signal::{handle_signals, SignalFlags, MAX_SIG};
+pub use signal::{SignalFlags, MAX_SIG};
+pub use task::TaskControlBlock;
 pub use {context::TaskContext, processor::run_tasks};
 
-use self::{manager::remove_from_pid_to_task, processor::current_task, task::TaskStatus};
+use self::{
+    manager::add_task,
+    processor::{current_process, current_task, schedule, take_current_task},
+    task::TaskStatus,
+};
 
 const INITPROC_NAME: &str = "initproc";
 
 lazy_static! {
-    pub static ref INITPROC: Arc<TaskControlBlock> = {
+    pub static ref INITPROC: Arc<ProcessControlBlock> = {
         let initproc_data = open_file(INITPROC_NAME, OpenFlags::READ_ONLY)
             .unwrap()
             .read_all();
-        Arc::new(TaskControlBlock::new(initproc_data.as_slice()))
+        ProcessControlBlock::new(initproc_data.as_slice())
     };
 }
 
 pub fn add_initproc() {
-    manager::add_task(INITPROC.clone());
+    let _initproc = INITPROC.clone();
 }
 
 // 暂停当前任务并切换为 idle 控制流
 pub fn suspend_current_and_run_next() {
-    let current_task = processor::take_current_task().unwrap();
+    let current_task = take_current_task().unwrap();
     let mut current_task_inner = current_task.inner_exclusive_access();
     current_task_inner.task_status = TaskStatus::Ready;
     let current_task_cx_ptr = &mut current_task_inner.task_cx as *mut TaskContext;
     drop(current_task_inner);
 
-    manager::add_task(current_task);
-    processor::schedule(current_task_cx_ptr);
+    add_task(current_task);
+    schedule(current_task_cx_ptr);
 }
 
+/// 退出当前进程并运行下一个进程
 pub fn exit_current_and_run_next(exit_code: i32) {
-    let current_task = processor::take_current_task().unwrap();
-    let mut current_task_inner = current_task.inner_exclusive_access();
-    current_task_inner.task_status = TaskStatus::Zombie;
-    current_task_inner.exit_code = exit_code;
-    let mut initproc_inner = INITPROC.inner_exclusive_access();
-    for child in current_task_inner.children.iter() {
-        child.inner_exclusive_access().parent = Some(Arc::downgrade(&INITPROC));
-        initproc_inner.children.push(child.clone());
+    let task = current_task().unwrap();
+    let task_inner = task.inner_exclusive_access();
+    let process = task.process.upgrade().unwrap();
+    let tid = task_inner.res.as_ref().unwrap().tid;
+
+    task_inner.exit_code = Some(exit_code);
+    // 释放 tid 和线程资源
+    task_inner.res = None;
+
+    drop(task_inner);
+    drop(task);
+
+    // 如果主线程（tid == 0）被终止，那么进程也需要被终止
+    if tid == 0 {
+        let process_inner = process.inner_exclusive_access();
+        process_inner.is_zombie = true;
+        process_inner.exit_code = exit_code;
+
+        // 将当前进程的子进程挂到 initproc 上
+        let mut initproc_inner = INITPROC.inner_exclusive_access();
+        for child in process_inner.children.iter() {
+            child.inner_exclusive_access().parent = Some(Arc::downgrade(&INITPROC));
+            initproc_inner.children.push(Arc::clone(child));
+        }
+        drop(initproc_inner);
+
+        // 释放当前进程的全部线程的资源（比如 ustack 等）
+        for task in process_inner.tasks.iter().filter(|t| t.is_some()) {
+            let task = task.as_deref().unwrap();
+            let task_inner = task.inner_exclusive_access();
+            task_inner.res = None;
+        }
+
+        process_inner.children.clear();
+        process_inner.memory_set.recycle_data_pages();
     }
-    current_task_inner.children.clear();
-    current_task_inner.memory_set.release_areas();
 
-    remove_from_pid_to_task(current_task.getpid());
+    drop(process);
 
-    drop(initproc_inner);
-    drop(current_task_inner);
-    drop(current_task);
-
-    // 这里我有个疑问：`_unused` 何时被释放？
-    // `processor::schedule` 这个方法直接调用 `__switch` 方法，
-    // `exit_current_and_run_next` 的 `drop` 方法将不会被调用，
-    // 但是我们会在 parent 方法的 waitpid 系统调用中清理栈内资源，
-    // 同时也要注意的是堆资源是必须手动清理的，比如上面的 `initproc_inner`。
+    // _unused 依然存储在 kernel stack 中，需要等待 waitpid 的进程对其释放
     let mut _unused = TaskContext::zero_init();
-    processor::schedule((&mut _unused) as *mut TaskContext)
+    schedule((&mut _unused) as *mut TaskContext);
 }
 
 /// 给当前进程添加一个信号
 pub fn current_add_signal(flag: SignalFlags) {
-    let task = current_task().unwrap();
-    let mut task_inner = task.inner_exclusive_access();
-    task_inner.signals.insert(flag);
+    let process = current_process();
+    let process_inner = process.inner_exclusive_access();
+    process_inner.signals.insert(flag);
 }
 
 /// 返回特殊信号的 ID 和错误信息
 pub fn check_signals_error_of_current() -> Option<(i32, &'static str)> {
-    let task = current_task().unwrap();
-    let task_inner = task.inner_exclusive_access();
-    task_inner.signals.check_error()
+    let process = current_process();
+    let process_inner = process.inner_exclusive_access();
+    process_inner.signals.check_error()
 }

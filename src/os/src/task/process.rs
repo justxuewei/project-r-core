@@ -262,10 +262,3 @@ impl ProcessControlBlock {
         *task_inner.get_trap_cx() = trap_cx;
     }
 }
-
-#[derive(Clone, Copy, PartialEq)]
-pub enum TaskStatus {
-    Ready,
-    Running,
-    Zombie,
-}
