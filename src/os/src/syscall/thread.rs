@@ -2,7 +2,11 @@ use alloc::sync::Arc;
 
 use crate::{
     mm::memory_set::kernel_token,
-    task::{manager::add_task, processor::current_task, TaskControlBlock},
+    task::{
+        manager::add_task,
+        processor::{current_process, current_task},
+        TaskControlBlock,
+    },
     trap::{trap_handler, TrapContext},
 };
 
@@ -41,9 +45,40 @@ pub fn sys_thread_create(entry: usize, arg: usize) -> isize {
 }
 
 pub fn sys_waittid(tid: usize) -> isize {
-    unimplemented!()
+    let task = current_task().unwrap();
+    let task_inner = task.inner_exclusive_access();
+    let process = current_process();
+    let mut process_inner = process.inner_exclusive_access();
+
+    // 不能自己等自己结束
+    if task_inner.res.as_ref().unwrap().tid == tid {
+        println!("[kernel] a thread cannot wait itself");
+        return -1;
+    }
+    let mut exit_code: Option<i32> = None;
+    let waited_task = process_inner.tasks[tid].as_ref();
+    if let Some(waited_task) = waited_task {
+        exit_code = waited_task.inner_exclusive_access().exit_code;
+    } else {
+        println!("[kernel] tid {} not found", tid);
+        return -1;
+    }
+
+    if let Some(exit_code) = exit_code {
+        process_inner.tasks[tid] = None;
+        exit_code as isize
+    } else {
+        // 等待的线程还没有结束运行
+        -2
+    }
 }
 
 pub fn sys_gettid() -> isize {
-    unimplemented!()
+    current_task()
+        .unwrap()
+        .inner_exclusive_access()
+        .res
+        .as_ref()
+        .unwrap()
+        .tid as isize
 }
