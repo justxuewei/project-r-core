@@ -15,6 +15,7 @@ const SYSCALL_WAITPID: usize = 260;
 
 mod fs;
 mod process;
+mod sync;
 mod thread;
 
 use fs::*;

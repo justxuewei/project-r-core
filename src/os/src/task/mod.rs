@@ -20,7 +20,7 @@ pub use task::TaskControlBlock;
 pub use {context::TaskContext, processor::run_tasks};
 
 use self::{
-    manager::add_task,
+    manager::{add_task, remove_from_pid_to_pcb},
     processor::{current_process, current_task, schedule, take_current_task},
     task::TaskStatus,
 };
@@ -68,6 +68,7 @@ pub fn exit_current_and_run_next(exit_code: i32) {
 
     // 如果主线程（tid == 0）被终止，那么进程也需要被终止
     if tid == 0 {
+        remove_from_pid_to_pcb(process.getpid());
         let mut process_inner = process.inner_exclusive_access();
         process_inner.is_zombie = true;
         process_inner.exit_code = exit_code;
@@ -96,6 +97,11 @@ pub fn exit_current_and_run_next(exit_code: i32) {
     // _unused 依然存储在 kernel stack 中，需要等待 waitpid 的进程对其释放
     let mut _unused = TaskContext::zero_init();
     schedule((&mut _unused) as *mut TaskContext);
+}
+
+/// 阻塞当前线程并运行下一个
+pub fn block_current_and_run_next() {
+    unimplemented!()
 }
 
 /// 给当前进程添加一个信号

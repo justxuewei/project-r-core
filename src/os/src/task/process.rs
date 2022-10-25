@@ -16,7 +16,7 @@ use super::{
 use crate::{
     fs::{File, Stdin, Stdout},
     mm::{memory_set::MemorySet, page_table::translated_ref_mut, KERNEL_SPACE},
-    sync::UPSafeCell,
+    sync::{mutex::Mutex, UPSafeCell},
     trap::{self, trap_handler, TrapContext},
 };
 
@@ -42,6 +42,8 @@ pub struct ProcessControlBlockInner {
 
     pub tasks: Vec<Option<Arc<TaskControlBlock>>>,
     pub task_res_allocator: RecycleAllocator,
+
+    pub mutex_list: Vec<Option<Arc<dyn Mutex>>>,
 }
 
 impl ProcessControlBlockInner {
@@ -104,6 +106,7 @@ impl ProcessControlBlock {
                 signals: SignalFlags::empty(),
                 tasks: Vec::new(),
                 task_res_allocator: RecycleAllocator::new(),
+                mutex_list: Vec::new(),
             })
         };
 
@@ -170,6 +173,7 @@ impl ProcessControlBlock {
             signals: SignalFlags::empty(),
             tasks: Vec::new(),
             task_res_allocator: RecycleAllocator::new(),
+            mutex_list: Vec::new(),
         };
         let child = Arc::new(ProcessControlBlock {
             pid: pid_handle,
