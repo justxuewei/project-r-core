@@ -1,7 +1,5 @@
 use bitflags::*;
 
-pub const MAX_SIG: usize = 31;
-
 bitflags! {
     pub struct SignalFlags: u32 {
         const SIGDEF = 1; // Default signal handling

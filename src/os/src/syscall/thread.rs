@@ -10,7 +10,11 @@ use crate::{
     trap::{trap_handler, TrapContext},
 };
 
-/// 创建线程
+/// 创建线程（非主线程）
+///
+/// 参数：
+/// - entry 是线程程序入口地址。
+/// - arg 是程序的启动参数。
 pub fn sys_thread_create(entry: usize, arg: usize) -> isize {
     let task = current_task().unwrap();
     let process = task.process.upgrade().unwrap();
@@ -55,7 +59,7 @@ pub fn sys_waittid(tid: usize) -> isize {
         println!("[kernel] a thread cannot wait itself");
         return -1;
     }
-    let mut exit_code: Option<i32> = None;
+    let exit_code: Option<i32>;
     let waited_task = process_inner.tasks[tid].as_ref();
     if let Some(waited_task) = waited_task {
         exit_code = waited_task.inner_exclusive_access().exit_code;

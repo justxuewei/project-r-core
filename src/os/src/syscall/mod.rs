@@ -12,6 +12,12 @@ const SYSCALL_GETPID: usize = 172;
 const SYSCALL_FORK: usize = 220;
 const SYSCALL_EXEC: usize = 221;
 const SYSCALL_WAITPID: usize = 260;
+const SYSCALL_THREAD_CREATE: usize = 1000;
+const SYSCALL_GETTID: usize = 1001;
+const SYSCALL_WAITTID: usize = 1002;
+const SYSCALL_MUTEX_CREATE: usize = 1010;
+const SYSCALL_MUTEX_LOCK: usize = 1011;
+const SYSCALL_MUTEX_UNLOCK: usize = 1012;
 
 mod fs;
 mod process;
@@ -20,6 +26,8 @@ mod thread;
 
 use fs::*;
 use process::*;
+use sync::*;
+use thread::*;
 
 pub fn syscall(syscall_id: usize, args: [usize; 3]) -> isize {
     match syscall_id {
@@ -37,6 +45,12 @@ pub fn syscall(syscall_id: usize, args: [usize; 3]) -> isize {
         SYSCALL_PIPE => sys_pipe(args[0] as *mut usize),
         SYSCALL_DUP => sys_dup(args[0]),
         SYSCALL_KILL => sys_kill(args[0], args[1] as i32),
+        SYSCALL_THREAD_CREATE => sys_thread_create(args[0], args[1]),
+        SYSCALL_GETTID => sys_gettid(),
+        SYSCALL_WAITTID => sys_waittid(args[0]) as isize,
+        SYSCALL_MUTEX_CREATE => sys_mutex_create(args[0] == 1),
+        SYSCALL_MUTEX_LOCK => sys_mutex_lock(args[0]),
+        SYSCALL_MUTEX_UNLOCK => sys_mutex_unlock(args[0]),
         _ => panic!("Unsupported system_id: {}", syscall_id),
     }
 }

@@ -15,7 +15,7 @@ use crate::{
     task::process::ProcessControlBlock,
 };
 
-pub use signal::{SignalFlags, MAX_SIG};
+pub use signal::SignalFlags;
 pub use task::TaskControlBlock;
 pub use {context::TaskContext, processor::run_tasks};
 
@@ -101,7 +101,12 @@ pub fn exit_current_and_run_next(exit_code: i32) {
 
 /// 阻塞当前线程并运行下一个
 pub fn block_current_and_run_next() {
-    unimplemented!()
+    let task = current_task().unwrap();
+    let mut task_inner = task.inner_exclusive_access();
+    let task_cx_ptr = &mut task_inner.task_cx as *mut TaskContext;
+    task_inner.task_status = TaskStatus::Blocking;
+    drop(task_inner);
+    schedule(task_cx_ptr);
 }
 
 /// 给当前进程添加一个信号
