@@ -4,7 +4,7 @@ use alloc::{
 };
 
 use crate::{
-    config::{KERNEL_STACK_SIZE, PAGE_SIZE, TRAMPOLINE, TRAP_CONTEXT, USER_STACK_SIZE},
+    config::{KERNEL_STACK_SIZE, PAGE_SIZE, TRAMPOLINE, TRAP_CONTEXT_BASE, USER_STACK_SIZE},
     mm::{
         address::{PhysPageNum, VirtAddr},
         memory_set::MapPermission,
@@ -120,7 +120,7 @@ fn ustack_bottom_from_tid(ustack_base: usize, tid: usize) -> usize {
 
 /// 获取 trap context 的底端（TRAMPOLINE）
 fn trap_cx_bottom_from_tid(tid: usize) -> usize {
-    TRAP_CONTEXT - tid * PAGE_SIZE
+    TRAP_CONTEXT_BASE - tid * PAGE_SIZE
 }
 
 pub struct RecycleAllocator {

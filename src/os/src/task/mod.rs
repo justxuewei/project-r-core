@@ -36,6 +36,7 @@ lazy_static! {
     };
 }
 
+/// 让 INITPROC 加载，主线程会自动被加入调度队列。
 pub fn add_initproc() {
     let _initproc = INITPROC.clone();
 }
@@ -121,4 +122,8 @@ pub fn check_signals_error_of_current() -> Option<(i32, &'static str)> {
     let process = current_process();
     let process_inner = process.inner_exclusive_access();
     process_inner.signals.check_error()
+}
+
+fn remove_inactive_task(task: Arc<TaskControlBlock>) {
+    
 }

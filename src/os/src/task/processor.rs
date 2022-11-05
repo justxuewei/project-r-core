@@ -74,16 +74,24 @@ pub fn current_trap_cx() -> &'static mut TrapContext {
 // 无限循环直至有一个 task 到来，此时使用 __switch 切换进程
 pub fn run_tasks() {
     loop {
+        println!("xuewei debug 1: started to run_tasks");
         let mut processor = PROCESSOR.exclusive_access();
         if let Some(next_task) = manager::fetch_task() {
+            let process = next_task.process.upgrade().unwrap();
             let idle_task_cx_ptr = processor.get_idle_task_cx_ptr();
             let mut next_task_inner = next_task.inner_exclusive_access();
+            println!(
+                "xuewei debug 2: fetched a new task, pid = {}, tid = {}",
+                process.getpid(),
+                next_task_inner.res.as_ref().unwrap().tid
+            );
             let next_task_cx_ptr = &next_task_inner.task_cx as *const TaskContext;
             next_task_inner.task_status = TaskStatus::Running;
             drop(next_task_inner);
             processor.current = Some(next_task);
             drop(processor);
 
+            println!("xuewei debug 3: switching...");
             unsafe { __switch(idle_task_cx_ptr, next_task_cx_ptr) }
         }
     }

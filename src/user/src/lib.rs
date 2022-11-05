@@ -60,8 +60,7 @@ pub extern "C" fn _start(argc: usize, argv_base: usize) -> ! {
             .unwrap(),
         );
     }
-    exit(main(argc, &argv));
-    panic!("unreachable after sys_exit!");
+    exit(main(argc, &argv))
 }
 
 #[linkage = "weak"]
@@ -84,7 +83,7 @@ pub fn write(fd: usize, buf: &[u8]) -> isize {
     sys_write(fd, buf)
 }
 
-pub fn exit(exit_code: i32) -> isize {
+pub fn exit(exit_code: i32) -> ! {
     sys_exit(exit_code)
 }
 

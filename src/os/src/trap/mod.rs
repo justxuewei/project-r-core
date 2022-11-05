@@ -98,7 +98,7 @@ pub fn trap_handler() -> ! {
 /// 用于从内核态切换为用户态，并在用户态调用 __restore 方法
 pub fn trap_return() -> ! {
     set_user_trap_entry();
-    let trap_cx_ptr = config::TRAP_CONTEXT;
+    let trap_cx_ptr = config::TRAP_CONTEXT_BASE;
     let user_token = processor::current_user_token();
     extern "C" {
         fn __alltraps();
