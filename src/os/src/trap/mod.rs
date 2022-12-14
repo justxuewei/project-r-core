@@ -4,8 +4,7 @@ use crate::{
     config,
     syscall::syscall,
     task::{
-        self, check_signals_error_of_current, exit_current_and_run_next, handle_signals, processor,
-        SignalFlags,
+        self, check_signals_error_of_current, exit_current_and_run_next, processor, SignalFlags,
     },
     timer,
 };
@@ -44,6 +43,8 @@ pub fn enable_timer_interrupt() {
 }
 
 #[no_mangle]
+/// 当系统从用户态切换到内核态的时候，trap_handler 最先被执行，可以根据陷入的原
+/// 因执行相应的逻辑，比如执行 syscall、处理段错误（segment fault）等等。
 pub fn trap_handler() -> ! {
     set_kernel_trap_entry();
     let scause = scause::read(); // trap 原因
@@ -85,7 +86,6 @@ pub fn trap_handler() -> ! {
         }
     }
 
-    handle_signals();
     if let Some((sig, msg)) = check_signals_error_of_current() {
         println!("[kernel] Error from signal: {}, sig = {}", msg, sig);
         exit_current_and_run_next(sig);
@@ -95,10 +95,10 @@ pub fn trap_handler() -> ! {
 }
 
 #[no_mangle]
-// 用于从内核态切换为用户态，并在用户态调用 __restore 方法
+/// 用于从内核态切换为用户态，并在用户态调用 __restore 方法
 pub fn trap_return() -> ! {
     set_user_trap_entry();
-    let trap_cx_ptr = config::TRAP_CONTEXT;
+    let trap_cx_ptr = config::TRAP_CONTEXT_BASE;
     let user_token = processor::current_user_token();
     extern "C" {
         fn __alltraps();

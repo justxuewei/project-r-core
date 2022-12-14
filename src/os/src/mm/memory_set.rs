@@ -54,6 +54,7 @@ bitflags! {
     }
 }
 
+#[derive(Debug)]
 pub struct MapArea {
     vpn_range: VPNRange,
     data_frames: BTreeMap<VirtPageNum, FrameTracker>,
@@ -150,6 +151,7 @@ impl MapArea {
     }
 }
 
+#[derive(Debug)]
 pub struct MemorySet {
     page_table: PageTable,
     areas: Vec<MapArea>,
@@ -290,6 +292,15 @@ impl MemorySet {
     // from_elf 根据 elf 文件创建一个 mmset，
     // 完成的事情包括验证 elf 文件是否合法，根据 program headers 加载数据的逻辑段，
     // 设置 user stack，以及设置 trap context 地址。
+    //
+    //     low addr
+    //   ┌───────────┐ ◀────── (bottom)
+    //   │           │
+    //   │ UserStack │
+    //   │           │
+    //   └───────────┘ ◀────── ustack_base (top)
+    //     high addr
+    //
     // returns:
     //  - memory_set
     //  - user stack 栈顶虚拟地址
@@ -333,34 +344,13 @@ impl MemorySet {
         }
 
         let max_end_va: VirtAddr = max_end_vpn.into();
-        let mut user_stack_bottom: usize = max_end_va.into();
+        let mut ustack_base: usize = max_end_va.into();
         // guard page
-        user_stack_bottom += config::PAGE_SIZE;
-
-        // user stack
-        let user_stack_top = user_stack_bottom + config::USER_STACK_SIZE;
-        let user_stack_start_va = user_stack_bottom.into();
-        let user_stack_end_va = user_stack_top.into();
-        let user_stack_map_area = MapArea::new(
-            user_stack_start_va,
-            user_stack_end_va,
-            MapType::Framed,
-            MapPermission::R | MapPermission::W | MapPermission::U,
-        );
-        memory_set.push(user_stack_map_area, None);
-
-        // trap context
-        let trap_ctx_map_area = MapArea::new(
-            config::TRAP_CONTEXT.into(),
-            config::TRAMPOLINE.into(),
-            MapType::Framed,
-            MapPermission::R | MapPermission::W,
-        );
-        memory_set.push(trap_ctx_map_area, None);
+        ustack_base += config::PAGE_SIZE;
 
         (
             memory_set,
-            user_stack_top,
+            ustack_base,
             elf.header.pt2.entry_point() as usize,
         )
     }
@@ -399,7 +389,8 @@ impl MemorySet {
         self.page_table.translate(vpn)
     }
 
-    pub fn release_areas(&mut self) {
+    /// 移除全部的内存，比如代码区、bss 区等
+    pub fn recycle_data_pages(&mut self) {
         self.areas.clear()
     }
 }

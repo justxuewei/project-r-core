@@ -11,7 +11,7 @@ pub const PAGE_SIZE_BITS: usize = 0xc;
 // high kernel/application address space
 // Ref: https://rcore-os.github.io/rCore-Tutorial-Book-v3/chapter4/5kernel-app-spaces.html#id6
 pub const TRAMPOLINE: usize = usize::MAX - PAGE_SIZE + 1;
-pub const TRAP_CONTEXT: usize = TRAMPOLINE - PAGE_SIZE;
+pub const TRAP_CONTEXT_BASE: usize = TRAMPOLINE - PAGE_SIZE;
 
 // CLOCK_FREQ is clock frequency, in this case, the value is for qemu.
 pub const CLOCK_FREQ: usize = 12500000;

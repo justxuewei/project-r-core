@@ -24,6 +24,9 @@ impl TaskContext {
         }
     }
 
+    /// 创建一个 trap_return 的 TaskContext，拥有这个 TaskContext 的线程，在执行
+    /// 的时候将会直接返回用户态，具体操作是：
+    /// other thread -> trap_return -> user application
     pub fn goto_trap_return(kstack_ptr: usize) -> Self {
         Self {
             ra: trap_return as usize,

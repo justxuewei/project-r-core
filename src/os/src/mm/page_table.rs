@@ -67,6 +67,7 @@ impl PageTableEntry {
     }
 }
 
+#[derive(Debug)]
 pub struct PageTable {
     root_ppn: PhysPageNum,
     frames: Vec<FrameTracker>,

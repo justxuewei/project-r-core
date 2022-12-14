@@ -60,8 +60,7 @@ pub extern "C" fn _start(argc: usize, argv_base: usize) -> ! {
             .unwrap(),
         );
     }
-    exit(main(argc, &argv));
-    panic!("unreachable after sys_exit!");
+    exit(main(argc, &argv))
 }
 
 #[linkage = "weak"]
@@ -84,7 +83,7 @@ pub fn write(fd: usize, buf: &[u8]) -> isize {
     sys_write(fd, buf)
 }
 
-pub fn exit(exit_code: i32) -> isize {
+pub fn exit(exit_code: i32) -> ! {
     sys_exit(exit_code)
 }
 
@@ -165,18 +164,37 @@ pub fn kill(pid: usize, signal: i32) -> isize {
     sys_kill(pid, signal)
 }
 
-pub fn sigaction(
-    signum: i32,
-    action: *const SignalAction,
-    old_action: *const SignalAction,
-) -> isize {
-    sys_sigaction(signum, action, old_action)
+pub fn thread_create(entry: usize, arg: usize) -> isize {
+    sys_thread_create(entry, arg)
 }
 
-pub fn sigprocmask(mask: u32) -> isize {
-    sys_sigprocmask(mask)
+pub fn gettid() -> isize {
+    sys_gettid()
 }
 
-pub fn sigreturn() -> isize {
-    sys_sigreturn()
+pub fn waittid(tid: usize) -> isize {
+    loop {
+        match sys_waittid(tid) {
+            -2 => {
+                yield_();
+            }
+            exit_code => return exit_code,
+        }
+    }
+}
+
+pub fn mutex_create() -> isize {
+    sys_mutex_create(false)
+}
+
+pub fn mutex_blocking_create() -> isize {
+    sys_mutex_create(true)
+}
+
+pub fn mutex_lock(mutex_id: usize) {
+    sys_mutex_lock(mutex_id);
+}
+
+pub fn mutex_unlock(mutex_id: usize) {
+    sys_mutex_unlock(mutex_id);
 }
